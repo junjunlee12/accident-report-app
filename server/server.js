@@ -60,13 +60,18 @@ async function saveSettings(settings) {
   )
 }
 
-// transporter 생성
+// transporter 생성 (포트 587 + STARTTLS 사용)
 function createTransporter(smtpConfig) {
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
     auth: {
       user: smtpConfig.email,
       pass: smtpConfig.appPassword
+    },
+    tls: {
+      rejectUnauthorized: false
     }
   })
 }
