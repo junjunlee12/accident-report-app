@@ -109,13 +109,13 @@ app.get('/api/settings', async (req, res) => {
   const settings = await loadSettings()
   const hasBrevoKey = !!process.env.BREVO_API_KEY
 
-  if (settings && hasBrevoKey) {
+  if (settings?.senderEmail && hasBrevoKey) {
     res.json({ success: true, settings })
   } else {
     res.json({
       success: false,
       settings: settings || null,
-      message: !hasBrevoKey ? 'BREVO_API_KEY가 설정되지 않았습니다.' : '설정을 저장하세요.'
+      message: !hasBrevoKey ? 'BREVO_API_KEY가 설정되지 않았습니다.' : !settings?.senderEmail ? '발송자 이메일을 등록하고 설정 저장하세요.' : '설정을 저장하세요.'
     })
   }
 })
