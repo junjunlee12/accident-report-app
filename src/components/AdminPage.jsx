@@ -174,37 +174,19 @@ export default function AdminPage({ onAuthChange }) {
         </button>
       </div>
 
-      {/* 발송 Gmail 설정 */}
+      {/* 이메일 발송 설정 */}
       <div className="admin-card">
-        <h3>발송 이메일 설정 (Gmail)</h3>
-        <p style={{ fontSize: '12px', color: '#718096', marginBottom: '12px', lineHeight: 1.5 }}>
-          보고서를 발송할 Gmail 계정을 설정하세요.<br />
-          Google 계정 &gt; 보안 &gt; 2단계 인증 활성화 후<br />
-          앱 비밀번호를 생성하여 입력하세요.
-        </p>
+        <h3>이메일 발송 설정</h3>
         <div className="form-group">
-          <label className="form-label">Gmail 주소</label>
+          <label className="form-label">테스트 수신 이메일</label>
           <input
             type="email"
             className="form-input"
-            placeholder="example@gmail.com"
+            placeholder="테스트 이메일 받을 주소"
             value={settings.smtp?.email || ''}
             onChange={e => setSettings(prev => ({
               ...prev,
               smtp: { ...prev.smtp, email: e.target.value }
-            }))}
-          />
-        </div>
-        <div className="form-group">
-          <label className="form-label">앱 비밀번호 (16자리)</label>
-          <input
-            type="password"
-            className="form-input"
-            placeholder="Google 앱 비밀번호 입력"
-            value={settings.smtp?.appPassword || ''}
-            onChange={e => setSettings(prev => ({
-              ...prev,
-              smtp: { ...prev.smtp, appPassword: e.target.value }
             }))}
           />
         </div>
@@ -217,7 +199,7 @@ export default function AdminPage({ onAuthChange }) {
                 const res = await fetch(`${API_URL}/api/test-email`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({})
+                  body: JSON.stringify({ testTo: settings.smtp?.email })
                 })
                 const result = await res.json()
                 alert(result.message)

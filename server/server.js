@@ -3,15 +3,15 @@
  *
  * 환경변수:
  *   MONGODB_URI=mongodb+srv://... (MongoDB Atlas 연결 문자열)
- *   PORT=3001 (선택)
+ *   RESEND_API_KEY=re_... (Resend API 키)
  */
 
 const express = require('express')
 const cors = require('cors')
-const nodemailer = require('nodemailer')
 const multer = require('multer')
 const path = require('path')
 const { MongoClient } = require('mongodb')
+const { Resend } = require('resend')
 
 const app = express()
 const upload = multer({ storage: multer.memoryStorage() })
@@ -39,7 +39,7 @@ async function connectDB() {
   }
 }
 
-// 설정 읽기
+// 설정 읽기/저장
 async function loadSettings() {
   if (!db) return null
   try {
@@ -50,8 +50,7 @@ async function loadSettings() {
   }
 }
 
-// 설정 저장
-async function saveSettings(settings) {
+async function saveSettingsToDB(settings) {
   if (!db) throw new Error('데이터베이스가 연결되지 않았습니다.')
   await db.collection('settings').updateOne(
     { _id: 'admin_settings' },
@@ -60,48 +59,50 @@ async function saveSettings(settings) {
   )
 }
 
-// transporter 생성 (포트 587 + STARTTLS 사용)
-function createTransporter(smtpConfig) {
-  return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: {
-      user: smtpConfig.email,
-      pass: smtpConfig.appPassword
-    },
-    tls: {
-      rejectUnauthorized: false
-    }
+// Resend로 이메일 발송
+async function sendEmail({ to, subject, html, attachments }) {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) throw new Error('RESEND_API_KEY 환경변수가 설정되지 않았습니다.')
+
+  const resend = new Resend(apiKey)
+
+  const result = await resend.emails.send({
+    from: '사고보고시스템 <onboarding@resend.dev>',
+    to: Array.isArray(to) ? to : [to],
+    subject,
+    html,
+    attachments: attachments || []
   })
+
+  if (result.error) {
+    throw new Error(result.error.message)
+  }
+  return result
 }
 
 // ===== 설정 API =====
 
-// 관리자 설정 저장
 app.post('/api/settings', async (req, res) => {
   try {
-    await saveSettings(req.body)
+    await saveSettingsToDB(req.body)
     res.json({ success: true, message: '설정이 저장되었습니다.' })
   } catch (error) {
     res.status(500).json({ success: false, message: '설정 저장 실패: ' + error.message })
   }
 })
 
-// 관리자 설정 조회
 app.get('/api/settings', async (req, res) => {
   const settings = await loadSettings()
-  if (settings?.smtp?.email) {
-    // 비밀번호는 마스킹해서 보내기
-    const safe = { ...settings }
-    safe.smtp = {
-      ...safe.smtp,
-      appPassword: safe.smtp.appPassword ? '********' : '',
-      configured: !!(safe.smtp.email && safe.smtp.appPassword)
-    }
-    res.json({ success: true, settings: safe })
+  const hasResendKey = !!process.env.RESEND_API_KEY
+
+  if (settings && hasResendKey) {
+    res.json({ success: true, settings: { ...settings, emailConfigured: true } })
   } else {
-    res.json({ success: false, settings: null })
+    res.json({
+      success: false,
+      settings: settings || null,
+      message: !hasResendKey ? 'RESEND_API_KEY가 설정되지 않았습니다.' : null
+    })
   }
 })
 
@@ -112,14 +113,7 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
     const pdfBuffer = req.file?.buffer
 
     const settings = await loadSettings()
-    if (!settings?.smtp?.email || !settings?.smtp?.appPassword) {
-      return res.status(400).json({
-        success: false,
-        message: '관리자가 Gmail 발송 설정을 아직 완료하지 않았습니다. 관리자에게 문의하세요.'
-      })
-    }
-
-    const recipients = settings.recipients?.[reportSummary.projectName] || []
+    const recipients = settings?.recipients?.[reportSummary.projectName] || []
     const emailList = recipients.map(r => r.email).filter(Boolean)
 
     if (emailList.length === 0) {
@@ -129,11 +123,8 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
       })
     }
 
-    const transporter = createTransporter(settings.smtp)
-
-    const mailOptions = {
-      from: `"매립운영처 사고보고시스템" <${settings.smtp.email}>`,
-      to: emailList.join(', '),
+    await sendEmail({
+      to: emailList,
       subject: `[사고발생보고] ${reportSummary.projectName} - ${reportSummary.name} (${reportSummary.date})`,
       html: `
         <div style="font-family: 'Malgun Gothic', sans-serif; max-width: 600px; margin: 0 auto;">
@@ -162,9 +153,7 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
         filename: `사고발생보고서_${reportSummary.name}_${reportSummary.date}.pdf`,
         content: pdfBuffer
       }] : []
-    }
-
-    await transporter.sendMail(mailOptions)
+    })
 
     res.json({
       success: true,
@@ -180,20 +169,20 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
   }
 })
 
-// 이메일 설정 테스트 API
+// 이메일 테스트 API
 app.post('/api/test-email', async (req, res) => {
   try {
     const settings = await loadSettings()
-    if (!settings?.smtp?.email || !settings?.smtp?.appPassword) {
-      return res.status(400).json({ success: false, message: 'Gmail 설정이 없습니다. 관리자 페이지에서 설정을 저장하세요.' })
+    const testTo = req.body.testTo || settings?.smtp?.email
+
+    if (!testTo) {
+      return res.status(400).json({ success: false, message: '테스트 수신 이메일이 없습니다.' })
     }
 
-    const transporter = createTransporter(settings.smtp)
-    await transporter.sendMail({
-      from: `"매립운영처 사고보고시스템" <${settings.smtp.email}>`,
-      to: req.body.testTo || settings.smtp.email,
+    await sendEmail({
+      to: [testTo],
       subject: '[테스트] 사고보고시스템 이메일 발송 테스트',
-      text: '이 메일이 수신되었다면 이메일 설정이 정상적으로 완료된 것입니다.'
+      html: '<p>이 메일이 수신되었다면 이메일 설정이 정상적으로 완료된 것입니다.</p>'
     })
 
     res.json({ success: true, message: '테스트 이메일이 발송되었습니다.' })
@@ -202,9 +191,9 @@ app.post('/api/test-email', async (req, res) => {
   }
 })
 
-// 서버 상태 확인
+// 서버 상태
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', db: !!db, timestamp: new Date().toISOString() })
+  res.json({ status: 'ok', db: !!db, resend: !!process.env.RESEND_API_KEY, timestamp: new Date().toISOString() })
 })
 
 // 프론트엔드 라우팅 (SPA)
@@ -212,10 +201,10 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'))
 })
 
-// 서버 시작
 const PORT = process.env.PORT || 3001
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`사고보고서 서버가 포트 ${PORT}에서 실행 중입니다.`)
+    console.log(`Resend API: ${process.env.RESEND_API_KEY ? '설정됨' : '미설정'}`)
   })
 })
