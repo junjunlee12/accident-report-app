@@ -3,7 +3,7 @@
  *
  * 환경변수:
  *   MONGODB_URI=mongodb+srv://... (MongoDB Atlas 연결 문자열)
- *   RESEND_API_KEY=re_... (Resend API 키)
+ *   BREVO_API_KEY=xkeysib-... (Brevo API 키)
  */
 
 const express = require('express')
@@ -11,7 +11,6 @@ const cors = require('cors')
 const multer = require('multer')
 const path = require('path')
 const { MongoClient } = require('mongodb')
-const { Resend } = require('resend')
 
 const app = express()
 const upload = multer({ storage: multer.memoryStorage() })
@@ -39,7 +38,6 @@ async function connectDB() {
   }
 }
 
-// 설정 읽기/저장
 async function loadSettings() {
   if (!db) return null
   try {
@@ -59,25 +57,41 @@ async function saveSettingsToDB(settings) {
   )
 }
 
-// Resend로 이메일 발송
-async function sendEmail({ to, subject, html, attachments }) {
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) throw new Error('RESEND_API_KEY 환경변수가 설정되지 않았습니다.')
+// ===== Brevo API로 이메일 발송 =====
+async function sendEmail({ senderEmail, senderName, to, subject, html, attachments }) {
+  const apiKey = process.env.BREVO_API_KEY
+  if (!apiKey) throw new Error('BREVO_API_KEY 환경변수가 설정되지 않았습니다.')
 
-  const resend = new Resend(apiKey)
-
-  const result = await resend.emails.send({
-    from: '사고보고시스템 <onboarding@resend.dev>',
-    to: Array.isArray(to) ? to : [to],
+  const body = {
+    sender: { name: senderName || '매립운영처 사고보고시스템', email: senderEmail },
+    to: to.map(email => ({ email })),
     subject,
-    html,
-    attachments: attachments || []
+    htmlContent: html,
+  }
+
+  if (attachments && attachments.length > 0) {
+    body.attachment = attachments.map(att => ({
+      name: att.filename,
+      content: att.content.toString('base64')
+    }))
+  }
+
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'api-key': apiKey,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify(body)
   })
 
-  if (result.error) {
-    throw new Error(result.error.message)
+  if (!response.ok) {
+    const err = await response.json()
+    throw new Error(err.message || `Brevo API 오류: ${response.status}`)
   }
-  return result
+
+  return await response.json()
 }
 
 // ===== 설정 API =====
@@ -93,15 +107,15 @@ app.post('/api/settings', async (req, res) => {
 
 app.get('/api/settings', async (req, res) => {
   const settings = await loadSettings()
-  const hasResendKey = !!process.env.RESEND_API_KEY
+  const hasBrevoKey = !!process.env.BREVO_API_KEY
 
-  if (settings && hasResendKey) {
-    res.json({ success: true, settings: { ...settings, emailConfigured: true } })
+  if (settings && hasBrevoKey) {
+    res.json({ success: true, settings })
   } else {
     res.json({
       success: false,
       settings: settings || null,
-      message: !hasResendKey ? 'RESEND_API_KEY가 설정되지 않았습니다.' : null
+      message: !hasBrevoKey ? 'BREVO_API_KEY가 설정되지 않았습니다.' : '설정을 저장하세요.'
     })
   }
 })
@@ -113,7 +127,14 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
     const pdfBuffer = req.file?.buffer
 
     const settings = await loadSettings()
-    const recipients = settings?.recipients?.[reportSummary.projectName] || []
+    if (!settings?.senderEmail) {
+      return res.status(400).json({
+        success: false,
+        message: '관리자가 발송자 이메일을 설정하지 않았습니다. 관리자에게 문의하세요.'
+      })
+    }
+
+    const recipients = settings.recipients?.[reportSummary.projectName] || []
     const emailList = recipients.map(r => r.email).filter(Boolean)
 
     if (emailList.length === 0) {
@@ -124,6 +145,8 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
     }
 
     await sendEmail({
+      senderEmail: settings.senderEmail,
+      senderName: '매립운영처 사고보고시스템',
       to: emailList,
       subject: `[사고발생보고] ${reportSummary.projectName} - ${reportSummary.name} (${reportSummary.date})`,
       html: `
@@ -169,17 +192,20 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
   }
 })
 
-// 이메일 테스트 API
+// 이메일 테스트
 app.post('/api/test-email', async (req, res) => {
   try {
     const settings = await loadSettings()
-    const testTo = req.body.testTo || settings?.smtp?.email
-
+    const testTo = req.body.testTo || settings?.senderEmail
     if (!testTo) {
-      return res.status(400).json({ success: false, message: '테스트 수신 이메일이 없습니다.' })
+      return res.status(400).json({ success: false, message: '테스트 수신 이메일을 입력하세요.' })
+    }
+    if (!settings?.senderEmail) {
+      return res.status(400).json({ success: false, message: '발송자 이메일을 설정하세요.' })
     }
 
     await sendEmail({
+      senderEmail: settings.senderEmail,
       to: [testTo],
       subject: '[테스트] 사고보고시스템 이메일 발송 테스트',
       html: '<p>이 메일이 수신되었다면 이메일 설정이 정상적으로 완료된 것입니다.</p>'
@@ -191,12 +217,10 @@ app.post('/api/test-email', async (req, res) => {
   }
 })
 
-// 서버 상태
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', db: !!db, resend: !!process.env.RESEND_API_KEY, timestamp: new Date().toISOString() })
+  res.json({ status: 'ok', db: !!db, brevo: !!process.env.BREVO_API_KEY, timestamp: new Date().toISOString() })
 })
 
-// 프론트엔드 라우팅 (SPA)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'))
 })
@@ -205,6 +229,6 @@ const PORT = process.env.PORT || 3001
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`사고보고서 서버가 포트 ${PORT}에서 실행 중입니다.`)
-    console.log(`Resend API: ${process.env.RESEND_API_KEY ? '설정됨' : '미설정'}`)
+    console.log(`Brevo API: ${process.env.BREVO_API_KEY ? '설정됨' : '미설정'}`)
   })
 })

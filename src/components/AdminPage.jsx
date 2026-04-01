@@ -177,20 +177,24 @@ export default function AdminPage({ onAuthChange }) {
       {/* 이메일 발송 설정 */}
       <div className="admin-card">
         <h3>이메일 발송 설정</h3>
+        <p style={{ fontSize: '12px', color: '#718096', marginBottom: '12px', lineHeight: 1.5 }}>
+          보고서 발송 시 발신자로 표시될 이메일 주소입니다.<br />
+          Brevo에서 인증한 이메일 주소를 입력하세요.
+        </p>
         <div className="form-group">
-          <label className="form-label">테스트 수신 이메일</label>
+          <label className="form-label">발송자 이메일 <span className="required">*</span></label>
           <input
             type="email"
             className="form-input"
-            placeholder="테스트 이메일 받을 주소"
-            value={settings.smtp?.email || ''}
+            placeholder="발신자 이메일 주소"
+            value={settings.senderEmail || ''}
             onChange={e => setSettings(prev => ({
               ...prev,
-              smtp: { ...prev.smtp, email: e.target.value }
+              senderEmail: e.target.value
             }))}
           />
         </div>
-        {serverStatus === 'ok' && (
+        {serverStatus === 'ok' && settings.senderEmail && (
           <button
             className="btn-add"
             onClick={async () => {
@@ -199,7 +203,7 @@ export default function AdminPage({ onAuthChange }) {
                 const res = await fetch(`${API_URL}/api/test-email`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ testTo: settings.smtp?.email })
+                  body: JSON.stringify({ testTo: settings.senderEmail })
                 })
                 const result = await res.json()
                 alert(result.message)
