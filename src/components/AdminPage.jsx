@@ -26,7 +26,7 @@ export default function AdminPage({ onAuthChange }) {
       const API_URL = import.meta.env?.VITE_API_URL || ''
       const res = await fetch(`${API_URL}/api/settings`)
       const data = await res.json()
-      if (data.success && data.settings?.smtp?.email) {
+      if (data.success) {
         setServerStatus('ok')
       } else {
         setServerStatus('not_configured')
