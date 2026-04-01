@@ -77,10 +77,29 @@ export default function ReportForm() {
     files.forEach(file => {
       const reader = new FileReader()
       reader.onload = (ev) => {
-        setForm(prev => ({
-          ...prev,
-          photos: [...prev.photos, { name: file.name, data: ev.target.result }]
-        }))
+        // 이미지를 캔버스에서 리사이즈하여 용량 줄이기
+        const img = new Image()
+        img.onload = () => {
+          const maxSize = 1000
+          let w = img.width
+          let h = img.height
+          if (w > maxSize || h > maxSize) {
+            const r = Math.min(maxSize / w, maxSize / h)
+            w = Math.round(w * r)
+            h = Math.round(h * r)
+          }
+          const canvas = document.createElement('canvas')
+          canvas.width = w
+          canvas.height = h
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0, w, h)
+          const resizedData = canvas.toDataURL('image/jpeg', 0.7)
+          setForm(prev => ({
+            ...prev,
+            photos: [...prev.photos, { name: file.name, data: resizedData, width: w, height: h }]
+          }))
+        }
+        img.src = ev.target.result
       }
       reader.readAsDataURL(file)
     })

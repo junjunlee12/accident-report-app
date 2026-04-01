@@ -190,22 +190,12 @@ export async function generatePDF(report) {
   if (report.photos && report.photos.length > 0) {
     for (let i = 0; i < report.photos.length; i++) {
       try {
-        const photoData = report.photos[i].data
-        if (!photoData) continue
-
-        // 이미지 로드
-        const img = new Image()
-        img.src = photoData
-        const loaded = await new Promise((resolve) => {
-          img.onload = () => resolve(true)
-          img.onerror = () => resolve(false)
-        })
-
-        if (!loaded || img.width === 0) continue
+        const photo = report.photos[i]
+        if (!photo || !photo.data) continue
 
         doc.addPage()
 
-        // 헤더 텍스트를 캔버스로 그리기
+        // 헤더: "첨부사진 1/3"
         const hCanvas = document.createElement('canvas')
         hCanvas.width = pageWidth * scale
         hCanvas.height = 30 * scale
@@ -217,23 +207,9 @@ export async function generatePDF(report) {
         hCtx.fillText(`첨부사진 ${i + 1}/${report.photos.length}`, mm(15), mm(20))
         doc.addImage(hCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageWidth, 30)
 
-        // 사진을 캔버스에 그려서 리사이즈 후 JPEG로 변환
-        const pCanvas = document.createElement('canvas')
-        const maxPx = 1200
-        let w = img.width
-        let h = img.height
-        if (w > maxPx || h > maxPx) {
-          const r = Math.min(maxPx / w, maxPx / h)
-          w = Math.round(w * r)
-          h = Math.round(h * r)
-        }
-        pCanvas.width = w
-        pCanvas.height = h
-        const pCtx = pCanvas.getContext('2d')
-        pCtx.drawImage(img, 0, 0, w, h)
-        const resizedData = pCanvas.toDataURL('image/jpeg', 0.8)
-
-        // PDF에 사진 배치
+        // 사진 삽입 (이미 리사이즈된 JPEG 데이터)
+        const w = photo.width || 800
+        const h = photo.height || 600
         const maxW = 180
         const maxH = 230
         const ratio = Math.min(maxW / w, maxH / h)
@@ -241,7 +217,7 @@ export async function generatePDF(report) {
         const pdfH = h * ratio
         const xOffset = (pageWidth - pdfW) / 2
 
-        doc.addImage(resizedData, 'JPEG', xOffset, 35, pdfW, pdfH)
+        doc.addImage(photo.data, 'JPEG', xOffset, 35, pdfW, pdfH)
       } catch (e) {
         console.error('사진 추가 실패:', i, e)
       }
