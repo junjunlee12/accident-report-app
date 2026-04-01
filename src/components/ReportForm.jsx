@@ -210,6 +210,29 @@ export default function ReportForm() {
     }
   }
 
+  const handleShareKakao = async () => {
+    if (!submittedReport) return
+    try {
+      const blob = await generatePDF(submittedReport)
+      const fileName = `사고발생보고서_${submittedReport.name}_${submittedReport.date}.pdf`
+      const file = new File([blob], fileName, { type: 'application/pdf' })
+
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: '사고 발생보고서',
+          text: `[사고발생보고] ${submittedReport.projectName} - ${submittedReport.name} (${submittedReport.date})`
+        })
+      } else {
+        alert('이 브라우저에서는 공유 기능을 지원하지 않습니다.\nPDF 다운로드 후 카카오톡에서 직접 첨부해주세요.')
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('공유 실패:', err)
+      }
+    }
+  }
+
   const resetForm = () => {
     setForm({
       projectName: '', company: '', subContractor: '', location: '',
@@ -546,6 +569,13 @@ export default function ReportForm() {
                 {sendResult}
               </div>
             )}
+            <button
+              className="modal-btn"
+              onClick={handleShareKakao}
+              style={{ marginBottom: '8px', background: '#FEE500', color: '#191919' }}
+            >
+              카카오톡으로 공유
+            </button>
             <button className="modal-btn" onClick={handleDownloadPDF} style={{ marginBottom: '8px' }}>
               PDF 다운로드
             </button>
