@@ -189,45 +189,61 @@ export async function generatePDF(report) {
   // 사진이 있으면 별도 페이지에 추가
   if (report.photos && report.photos.length > 0) {
     for (let i = 0; i < report.photos.length; i++) {
-      doc.addPage()
-
-      // 사진 페이지 헤더 (Canvas로 그리기)
-      const photoCanvas = document.createElement('canvas')
-      photoCanvas.width = pageWidth * scale
-      photoCanvas.height = pageHeight * scale
-      const pCtx = photoCanvas.getContext('2d')
-      pCtx.fillStyle = '#ffffff'
-      pCtx.fillRect(0, 0, photoCanvas.width, photoCanvas.height)
-
-      pCtx.font = `bold ${mm(12 * 0.35)}px 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif`
-      pCtx.fillStyle = '#1a365d'
-      pCtx.fillText(`첨부사진 ${i + 1}/${report.photos.length}`, mm(15), mm(20))
-
-      const headerImg = photoCanvas.toDataURL('image/jpeg', 0.95)
-      doc.addImage(headerImg, 'JPEG', 0, 0, pageWidth, 30)
-
-      // 사진 추가
       try {
+        const photoData = report.photos[i].data
+        if (!photoData) continue
+
+        // 이미지 로드
         const img = new Image()
-        img.src = report.photos[i].data
-        await new Promise((resolve) => {
-          img.onload = resolve
-          img.onerror = resolve
+        img.src = photoData
+        const loaded = await new Promise((resolve) => {
+          img.onload = () => resolve(true)
+          img.onerror = () => resolve(false)
         })
 
+        if (!loaded || img.width === 0) continue
+
+        doc.addPage()
+
+        // 헤더 텍스트를 캔버스로 그리기
+        const hCanvas = document.createElement('canvas')
+        hCanvas.width = pageWidth * scale
+        hCanvas.height = 30 * scale
+        const hCtx = hCanvas.getContext('2d')
+        hCtx.fillStyle = '#ffffff'
+        hCtx.fillRect(0, 0, hCanvas.width, hCanvas.height)
+        hCtx.font = `bold ${mm(12 * 0.35)}px 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif`
+        hCtx.fillStyle = '#1a365d'
+        hCtx.fillText(`첨부사진 ${i + 1}/${report.photos.length}`, mm(15), mm(20))
+        doc.addImage(hCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageWidth, 30)
+
+        // 사진을 캔버스에 그려서 리사이즈 후 JPEG로 변환
+        const pCanvas = document.createElement('canvas')
+        const maxPx = 1200
+        let w = img.width
+        let h = img.height
+        if (w > maxPx || h > maxPx) {
+          const r = Math.min(maxPx / w, maxPx / h)
+          w = Math.round(w * r)
+          h = Math.round(h * r)
+        }
+        pCanvas.width = w
+        pCanvas.height = h
+        const pCtx = pCanvas.getContext('2d')
+        pCtx.drawImage(img, 0, 0, w, h)
+        const resizedData = pCanvas.toDataURL('image/jpeg', 0.8)
+
+        // PDF에 사진 배치
         const maxW = 180
-        const maxH = 240
-        let imgW = img.width
-        let imgH = img.height
+        const maxH = 230
+        const ratio = Math.min(maxW / w, maxH / h)
+        const pdfW = w * ratio
+        const pdfH = h * ratio
+        const xOffset = (pageWidth - pdfW) / 2
 
-        const ratio = Math.min(maxW / imgW, maxH / imgH)
-        imgW = imgW * ratio
-        imgH = imgH * ratio
-
-        const xOffset = (pageWidth - imgW) / 2
-        doc.addImage(report.photos[i].data, 'JPEG', xOffset, 35, imgW, imgH)
+        doc.addImage(resizedData, 'JPEG', xOffset, 35, pdfW, pdfH)
       } catch (e) {
-        console.error('사진 추가 실패:', e)
+        console.error('사진 추가 실패:', i, e)
       }
     }
   }

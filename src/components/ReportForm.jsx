@@ -124,14 +124,18 @@ export default function ReportForm() {
     try {
       const displayCompany = getDisplayCompany()
 
-      // 사진 데이터는 로컬 저장에서 제외 (용량 초과 방지)
+      // 사진 데이터 복사 (참조 유지)
+      const photosCopy = [...form.photos]
+
+      // 로컬 저장에는 사진 제외 (용량 초과 방지)
       const reportForSave = { ...form, displayCompany, photos: [] }
-      reportForSave.photoCount = form.photos.length
+      reportForSave.photoCount = photosCopy.length
       const report = saveReport(reportForSave)
-      setSubmittedReport({ ...report, photos: form.photos })
 
       // PDF에는 사진 포함
-      const reportWithPhotos = { ...report, photos: form.photos }
+      const reportWithPhotos = { ...report, photos: photosCopy }
+      setSubmittedReport(reportWithPhotos)
+
       const pdfBlob = await generatePDF(reportWithPhotos)
       const result = await sendNotification(reportWithPhotos, pdfBlob)
 
