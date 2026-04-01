@@ -19,6 +19,15 @@ export function getReports() {
   }
 }
 
+export function deleteReport(id) {
+  const reports = getReports().filter(r => r.id !== id)
+  localStorage.setItem(REPORTS_KEY, JSON.stringify(reports))
+}
+
+export function clearAllReports() {
+  localStorage.setItem(REPORTS_KEY, JSON.stringify([]))
+}
+
 export function updateReportStatus(id, status) {
   const reports = getReports()
   const idx = reports.findIndex(r => r.id === id)

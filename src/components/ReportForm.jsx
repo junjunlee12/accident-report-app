@@ -28,6 +28,7 @@ export default function ReportForm() {
     time: '',
     rank: '',
     name: '',
+    phone: '',
     birthDate: '',
     workExperienceYears: '',
     workExperienceMonths: '',
@@ -100,6 +101,7 @@ export default function ReportForm() {
     if (!form.location) missing.push('발생장소')
     if (!form.date) missing.push('일시')
     if (!form.name) missing.push('성명')
+    if (!form.phone) missing.push('연락처')
     if (!form.damageHuman && !form.damageProperty) missing.push('피해정도')
     if (!form.action.trim()) missing.push('조치 및 결과')
     if (form.photos.length === 0) missing.push('현장 및 피해사진')
@@ -147,6 +149,7 @@ export default function ReportForm() {
           company: report.displayCompany,
           subContractor: report.subContractor,
           name: report.name,
+          phone: report.phone,
           rank: report.rank,
           location: report.location,
           date: report.date,
@@ -181,7 +184,7 @@ export default function ReportForm() {
   const resetForm = () => {
     setForm({
       projectName: '', company: '', subContractor: '', location: '',
-      date: '', time: '', rank: '', name: '', birthDate: '',
+      date: '', time: '', rank: '', name: '', phone: '', birthDate: '',
       workExperienceYears: '', workExperienceMonths: '',
       description: '', damageHuman: false, damageHumanDetail: '',
       damageProperty: false, damagePropertyDetail: '',
@@ -312,6 +315,16 @@ export default function ReportForm() {
               onChange={e => update('name', e.target.value)}
             />
           </div>
+        </div>
+        <div className="form-group">
+          <label className="form-label">연락처 (전화번호) <span className="required">*</span></label>
+          <input
+            type="tel"
+            className="form-input"
+            placeholder="010-0000-0000"
+            value={form.phone}
+            onChange={e => update('phone', e.target.value)}
+          />
         </div>
         <div className="form-row">
           <div className="form-group">
