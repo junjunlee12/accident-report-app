@@ -106,23 +106,35 @@ export default function ReportForm() {
     return missing
   }
 
-  const handleSubmit = () => {
+  const [submitting, setSubmitting] = useState(false)
+  const [sendResult, setSendResult] = useState('')
+
+  const handleSubmit = async () => {
     const missing = validate()
     if (missing.length > 0) {
-      alert(`다음 필수 항목을 입력해주세요:\n${missing.join(', ')}`)
+      alert('다음 필수 항목을 입력해주세요:\n' + missing.join(', '))
       return
     }
 
-    // displayCompany를 report에 저장하여 PDF에서 사용
-    const displayCompany = getDisplayCompany()
-    const report = saveReport({ ...form, displayCompany })
-    setSubmittedReport(report)
-    setShowModal(true)
+    setSubmitting(true)
+    setSendResult('')
 
-    // PDF 생성 후 서버로 발송 요청
-    generatePDF(report).then(pdfBlob => {
-      sendNotification(report, pdfBlob)
-    })
+    try {
+      const displayCompany = getDisplayCompany()
+      const report = saveReport({ ...form, displayCompany })
+      setSubmittedReport(report)
+
+      const pdfBlob = await generatePDF(report)
+      const result = await sendNotification(report, pdfBlob)
+
+      setSendResult(result)
+      setShowModal(true)
+    } catch (err) {
+      setSendResult('오류: ' + err.message)
+      setShowModal(true)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const sendNotification = async (report, pdfBlob) => {
@@ -148,11 +160,9 @@ export default function ReportForm() {
         body: formData
       })
       const result = await res.json()
-      if (result.success) {
-        console.log('이메일 발송 성공:', result.message)
-      }
+      return result.message || (result.success ? '발송 완료' : '발송 실패')
     } catch (err) {
-      console.log('서버 미연결 - PDF는 로컬에 저장됩니다.', err.message)
+      return '서버 연결 실패: ' + err.message
     }
   }
 
@@ -474,8 +484,8 @@ export default function ReportForm() {
         )}
       </div>
 
-      <button className="submit-btn" onClick={handleSubmit}>
-        보고서 제출
+      <button className="submit-btn" onClick={handleSubmit} disabled={submitting}>
+        {submitting ? '제출 중...' : '보고서 제출'}
       </button>
 
       {/* 제출 완료 모달 */}
@@ -484,10 +494,16 @@ export default function ReportForm() {
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>&#x2705;</div>
             <h3>보고서가 제출되었습니다</h3>
-            <p>
-              관리자에게 알림이 전송됩니다.<br />
-              제출 내역에서 확인할 수 있습니다.
-            </p>
+            {sendResult && (
+              <div style={{
+                padding: '8px 12px', borderRadius: '6px', marginBottom: '12px',
+                fontSize: '13px',
+                background: sendResult.includes('실패') || sendResult.includes('오류') ? '#fed7d7' : '#c6f6d5',
+                color: sendResult.includes('실패') || sendResult.includes('오류') ? '#c53030' : '#276749'
+              }}>
+                {sendResult}
+              </div>
+            )}
             <button className="modal-btn" onClick={handleDownloadPDF} style={{ marginBottom: '8px' }}>
               PDF 다운로드
             </button>
