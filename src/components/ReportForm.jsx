@@ -462,7 +462,6 @@ export default function ReportForm() {
           type="file"
           accept="image/*"
           multiple
-          capture="environment"
           style={{ display: 'none' }}
           onChange={handlePhotoAdd}
         />
