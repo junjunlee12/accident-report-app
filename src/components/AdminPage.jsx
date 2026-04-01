@@ -52,8 +52,20 @@ export default function AdminPage({ onAuthChange }) {
     })
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // 로컬에 저장
     saveAdminSettings(settings)
+    // 서버에도 저장
+    try {
+      const API_URL = import.meta.env?.VITE_API_URL || ''
+      await fetch(`${API_URL}/api/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      })
+    } catch (err) {
+      console.log('서버 설정 저장 실패:', err.message)
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -161,7 +173,7 @@ export default function AdminPage({ onAuthChange }) {
                   const res = await fetch(`${API_URL}/api/test-email`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ smtp: settings.smtp })
+                    body: JSON.stringify({ testTo: settings.smtp.email })
                   })
                   const result = await res.json()
                   alert(result.message)

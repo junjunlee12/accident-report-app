@@ -1,10 +1,5 @@
 /**
  * 사고발생보고서 이메일 발송 백엔드 서버
- *
- * 사용법:
- * 1. npm install express cors nodemailer multer
- * 2. node server/server.js
- * 3. 앱 관리자 페이지에서 Gmail 설정 입력
  */
 
 const express = require('express')
@@ -12,6 +7,7 @@ const cors = require('cors')
 const nodemailer = require('nodemailer')
 const multer = require('multer')
 const path = require('path')
+const fs = require('fs')
 
 const app = express()
 const upload = multer({ storage: multer.memoryStorage() })
@@ -22,7 +18,27 @@ app.use(express.json({ limit: '50mb' }))
 // 프론트엔드 정적 파일 서빙
 app.use(express.static(path.join(__dirname, 'public')))
 
-// 동적 transporter 생성 (앱에서 전달받은 Gmail 설정 사용)
+// 설정 파일 경로
+const SETTINGS_FILE = path.join(__dirname, 'settings.json')
+
+// 설정 읽기
+function loadSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'))
+    }
+  } catch (e) {
+    console.error('설정 읽기 실패:', e)
+  }
+  return null
+}
+
+// 설정 저장
+function saveSettings(settings) {
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf8')
+}
+
+// 동적 transporter 생성
 function createTransporter(smtpConfig) {
   return nodemailer.createTransport({
     service: 'gmail',
@@ -33,33 +49,58 @@ function createTransporter(smtpConfig) {
   })
 }
 
-// 보고서 제출 + 이메일 발송 API
+// ===== 설정 API =====
+
+// 관리자 설정 저장
+app.post('/api/settings', (req, res) => {
+  try {
+    saveSettings(req.body)
+    res.json({ success: true, message: '설정이 저장되었습니다.' })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '설정 저장 실패: ' + error.message })
+  }
+})
+
+// 관리자 설정 조회
+app.get('/api/settings', (req, res) => {
+  const settings = loadSettings()
+  if (settings) {
+    res.json({ success: true, settings })
+  } else {
+    res.json({ success: false, settings: null })
+  }
+})
+
+// ===== 보고서 제출 + 이메일 발송 =====
 app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
   try {
-    const { recipients, reportSummary, smtp } = JSON.parse(req.body.data)
+    const { reportSummary } = JSON.parse(req.body.data)
     const pdfBuffer = req.file?.buffer
 
-    // Gmail 설정 확인
-    if (!smtp?.email || !smtp?.appPassword) {
+    // 서버에 저장된 설정 읽기
+    const settings = loadSettings()
+    if (!settings?.smtp?.email || !settings?.smtp?.appPassword) {
       return res.status(400).json({
         success: false,
-        message: '관리자 페이지에서 Gmail 발송 설정을 먼저 완료하세요.'
+        message: '관리자가 Gmail 발송 설정을 아직 완료하지 않았습니다.'
       })
     }
 
-    if (!recipients || recipients.length === 0) {
-      return res.json({ success: true, message: '수신자가 없어 이메일 발송을 건너뜁니다.' })
-    }
-
+    // 해당 사업명의 수신자 찾기
+    const recipients = settings.recipients?.[reportSummary.projectName] || []
     const emailList = recipients.map(r => r.email).filter(Boolean)
+
     if (emailList.length === 0) {
-      return res.json({ success: true, message: '유효한 이메일 주소가 없습니다.' })
+      return res.json({
+        success: true,
+        message: '해당 사업의 수신자가 등록되지 않았습니다. 관리자에게 문의하세요.'
+      })
     }
 
-    const transporter = createTransporter(smtp)
+    const transporter = createTransporter(settings.smtp)
 
     const mailOptions = {
-      from: `"매립운영처 사고보고시스템" <${smtp.email}>`,
+      from: `"매립운영처 사고보고시스템" <${settings.smtp.email}>`,
       to: emailList.join(', '),
       subject: `[사고발생보고] ${reportSummary.projectName} - ${reportSummary.name} (${reportSummary.date})`,
       html: `
@@ -109,15 +150,15 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
 // 이메일 설정 테스트 API
 app.post('/api/test-email', async (req, res) => {
   try {
-    const { smtp, testTo } = req.body
-    if (!smtp?.email || !smtp?.appPassword) {
-      return res.status(400).json({ success: false, message: 'Gmail 설정이 없습니다.' })
+    const settings = loadSettings()
+    if (!settings?.smtp?.email || !settings?.smtp?.appPassword) {
+      return res.status(400).json({ success: false, message: 'Gmail 설정이 없습니다. 먼저 설정을 저장하세요.' })
     }
 
-    const transporter = createTransporter(smtp)
+    const transporter = createTransporter(settings.smtp)
     await transporter.sendMail({
-      from: `"매립운영처 사고보고시스템" <${smtp.email}>`,
-      to: testTo || smtp.email,
+      from: `"매립운영처 사고보고시스템" <${settings.smtp.email}>`,
+      to: req.body.testTo || settings.smtp.email,
       subject: '[테스트] 사고보고시스템 이메일 발송 테스트',
       text: '이 메일이 수신되었다면 이메일 설정이 정상적으로 완료된 것입니다.'
     })
@@ -133,7 +174,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// 프론트엔드 라우팅 (SPA - 모든 경로를 index.html로)
+// 프론트엔드 라우팅 (SPA)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'))
 })

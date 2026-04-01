@@ -119,25 +119,17 @@ export default function ReportForm() {
     setSubmittedReport(report)
     setShowModal(true)
 
-    const settings = getAdminSettings()
-    const recipients = settings.recipients[form.projectName] || []
-    const validRecipients = recipients.filter(r => r.email)
-
-    if (validRecipients.length > 0) {
-      generatePDF(report).then(pdfBlob => {
-        sendNotification(report, pdfBlob, validRecipients)
-      })
-    }
+    // PDF 생성 후 서버로 발송 요청
+    generatePDF(report).then(pdfBlob => {
+      sendNotification(report, pdfBlob)
+    })
   }
 
-  const sendNotification = async (report, pdfBlob, recipients) => {
+  const sendNotification = async (report, pdfBlob) => {
     try {
       const formData = new FormData()
       formData.append('pdf', pdfBlob, `사고발생보고서_${report.name}_${report.date}.pdf`)
-      const settings = getAdminSettings()
       formData.append('data', JSON.stringify({
-        recipients,
-        smtp: settings.smtp,
         reportSummary: {
           projectName: report.projectName,
           company: report.displayCompany,
