@@ -4,6 +4,7 @@ import { generatePDF } from '../utils/pdfGenerator'
 
 export default function ReportList() {
   const [reports, setReports] = useState([])
+  const [resending, setResending] = useState(null)
 
   useEffect(() => {
     setReports(getReports())
@@ -17,6 +18,40 @@ export default function ReportList() {
     a.download = `사고발생보고서_${report.name}_${report.date}.pdf`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const handleResend = async (report) => {
+    setResending(report.id)
+    try {
+      const pdfBlob = await generatePDF(report)
+      const formData = new FormData()
+      formData.append('pdf', pdfBlob, `사고발생보고서_${report.name}_${report.date}.pdf`)
+      formData.append('data', JSON.stringify({
+        reportSummary: {
+          projectName: report.projectName,
+          company: report.displayCompany || report.company,
+          subContractor: report.subContractor,
+          name: report.name,
+          phone: report.phone,
+          rank: report.rank,
+          location: report.location,
+          date: report.date,
+          time: report.time,
+        }
+      }))
+
+      const API_URL = import.meta.env?.VITE_API_URL || ''
+      const res = await fetch(`${API_URL}/api/submit-report`, {
+        method: 'POST',
+        body: formData
+      })
+      const result = await res.json()
+      alert(result.message || (result.success ? '재발송 완료' : '재발송 실패'))
+    } catch (err) {
+      alert('서버 연결 실패: ' + err.message)
+    } finally {
+      setResending(null)
+    }
   }
 
   const handleDelete = (id) => {
@@ -77,7 +112,15 @@ export default function ReportList() {
           </div>
           <div className="report-card-actions">
             <button className="btn-pdf" onClick={() => handleDownload(report)}>
-              PDF 다운로드
+              PDF
+            </button>
+            <button
+              className="btn-pdf"
+              onClick={() => handleResend(report)}
+              disabled={resending === report.id}
+              style={{ color: '#2b6cb0', borderColor: '#bee3f8' }}
+            >
+              {resending === report.id ? '발송중...' : '재발송'}
             </button>
             <button
               className="btn-pdf"

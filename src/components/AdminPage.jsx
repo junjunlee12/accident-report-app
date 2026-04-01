@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { getAdminSettings, saveAdminSettings } from '../utils/storage'
 import { logoutAdmin, changeAdminCredentials, transferAdmin } from '../utils/auth'
 
@@ -11,12 +11,34 @@ const PROJECT_NAMES = [
 export default function AdminPage({ onAuthChange }) {
   const [settings, setSettings] = useState(getAdminSettings())
   const [saved, setSaved] = useState(false)
+  const [serverStatus, setServerStatus] = useState('checking') // 'checking', 'ok', 'not_configured', 'error'
   const [showPwChange, setShowPwChange] = useState(false)
   const [showTransfer, setShowTransfer] = useState(false)
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [newPwConfirm, setNewPwConfirm] = useState('')
   const [pwMessage, setPwMessage] = useState('')
+
+  // 서버 설정 상태 확인
+  const checkServerStatus = async () => {
+    setServerStatus('checking')
+    try {
+      const API_URL = import.meta.env?.VITE_API_URL || ''
+      const res = await fetch(`${API_URL}/api/settings`)
+      const data = await res.json()
+      if (data.success && data.settings?.smtp?.email) {
+        setServerStatus('ok')
+      } else {
+        setServerStatus('not_configured')
+      }
+    } catch {
+      setServerStatus('error')
+    }
+  }
+
+  useEffect(() => {
+    checkServerStatus()
+  }, [])
 
   const updateRecipient = (project, idx, field, value) => {
     setSettings(prev => {
@@ -58,16 +80,22 @@ export default function AdminPage({ onAuthChange }) {
     // 서버에도 저장
     try {
       const API_URL = import.meta.env?.VITE_API_URL || ''
-      await fetch(`${API_URL}/api/settings`, {
+      const res = await fetch(`${API_URL}/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
       })
+      const result = await res.json()
+      if (result.success) {
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2000)
+        checkServerStatus()
+      } else {
+        alert('서버 저장 실패: ' + result.message)
+      }
     } catch (err) {
-      console.log('서버 설정 저장 실패:', err.message)
+      alert('서버에 연결할 수 없습니다: ' + err.message)
     }
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
   }
 
   const handleLogout = () => {
@@ -118,9 +146,33 @@ export default function AdminPage({ onAuthChange }) {
 
   return (
     <div>
-      <h2 style={{ fontSize: '16px', marginBottom: '16px', color: '#1a365d' }}>
+      <h2 style={{ fontSize: '16px', marginBottom: '12px', color: '#1a365d' }}>
         관리자 설정
       </h2>
+
+      {/* 서버 설정 상태 */}
+      <div style={{
+        padding: '12px', borderRadius: '8px', marginBottom: '12px', fontSize: '13px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: serverStatus === 'ok' ? '#c6f6d5' : serverStatus === 'checking' ? '#e2e8f0' : '#fed7d7',
+        color: serverStatus === 'ok' ? '#276749' : serverStatus === 'checking' ? '#4a5568' : '#c53030',
+      }}>
+        <span>
+          {serverStatus === 'checking' && '서버 설정 확인 중...'}
+          {serverStatus === 'ok' && '서버 이메일 발송 준비 완료'}
+          {serverStatus === 'not_configured' && '서버에 설정이 없습니다. 아래 설정 후 저장하세요.'}
+          {serverStatus === 'error' && '서버에 연결할 수 없습니다.'}
+        </span>
+        <button
+          onClick={checkServerStatus}
+          style={{
+            padding: '4px 10px', background: 'rgba(255,255,255,0.7)', border: 'none',
+            borderRadius: '4px', fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit'
+          }}
+        >
+          새로고침
+        </button>
+      </div>
 
       {/* 발송 Gmail 설정 */}
       <div className="admin-card">
