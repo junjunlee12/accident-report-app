@@ -174,51 +174,60 @@ export default function AdminPage({ onAuthChange }) {
         </button>
       </div>
 
-      {/* 발송 Gmail 설정 안내 */}
+      {/* 발송 Gmail 설정 */}
       <div className="admin-card">
         <h3>발송 이메일 설정 (Gmail)</h3>
-        {serverStatus === 'ok' ? (
-          <div>
-            <div style={{
-              padding: '10px 12px', background: '#c6f6d5', borderRadius: '6px',
-              fontSize: '13px', color: '#276749', marginBottom: '10px'
-            }}>
-              Gmail 설정 완료 (서버 환경변수에 등록됨)
-            </div>
-            <button
-              className="btn-add"
-              onClick={async () => {
-                try {
-                  const API_URL = import.meta.env?.VITE_API_URL || ''
-                  const res = await fetch(`${API_URL}/api/test-email`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({})
-                  })
-                  const result = await res.json()
-                  alert(result.message)
-                } catch {
-                  alert('서버에 연결할 수 없습니다.')
-                }
-              }}
-            >
-              테스트 이메일 발송
-            </button>
-          </div>
-        ) : (
-          <div style={{
-            padding: '12px', background: '#fff5f5', borderRadius: '6px',
-            fontSize: '12px', color: '#c53030', lineHeight: 1.6
-          }}>
-            <strong>Render 대시보드에서 환경변수를 설정하세요:</strong><br /><br />
-            1. <a href="https://dashboard.render.com" target="_blank" rel="noopener" style={{ color: '#2b6cb0' }}>Render 대시보드</a> 접속<br />
-            2. 서비스 선택 &gt; Environment 탭<br />
-            3. 아래 3개 환경변수 추가:<br /><br />
-            <code style={{ background: '#edf2f7', padding: '2px 6px', borderRadius: '3px' }}>GMAIL_USER</code> = Gmail 주소<br />
-            <code style={{ background: '#edf2f7', padding: '2px 6px', borderRadius: '3px' }}>GMAIL_APP_PASSWORD</code> = 앱 비밀번호 16자리<br />
-            <code style={{ background: '#edf2f7', padding: '2px 6px', borderRadius: '3px' }}>RECIPIENTS</code> = 수신자 JSON<br /><br />
-            4. Save Changes 클릭 (자동 재배포)
-          </div>
+        <p style={{ fontSize: '12px', color: '#718096', marginBottom: '12px', lineHeight: 1.5 }}>
+          보고서를 발송할 Gmail 계정을 설정하세요.<br />
+          Google 계정 &gt; 보안 &gt; 2단계 인증 활성화 후<br />
+          앱 비밀번호를 생성하여 입력하세요.
+        </p>
+        <div className="form-group">
+          <label className="form-label">Gmail 주소</label>
+          <input
+            type="email"
+            className="form-input"
+            placeholder="example@gmail.com"
+            value={settings.smtp?.email || ''}
+            onChange={e => setSettings(prev => ({
+              ...prev,
+              smtp: { ...prev.smtp, email: e.target.value }
+            }))}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">앱 비밀번호 (16자리)</label>
+          <input
+            type="password"
+            className="form-input"
+            placeholder="Google 앱 비밀번호 입력"
+            value={settings.smtp?.appPassword || ''}
+            onChange={e => setSettings(prev => ({
+              ...prev,
+              smtp: { ...prev.smtp, appPassword: e.target.value }
+            }))}
+          />
+        </div>
+        {serverStatus === 'ok' && (
+          <button
+            className="btn-add"
+            onClick={async () => {
+              try {
+                const API_URL = import.meta.env?.VITE_API_URL || ''
+                const res = await fetch(`${API_URL}/api/test-email`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({})
+                })
+                const result = await res.json()
+                alert(result.message)
+              } catch {
+                alert('서버에 연결할 수 없습니다.')
+              }
+            }}
+          >
+            테스트 이메일 발송
+          </button>
         )}
       </div>
 
@@ -266,19 +275,9 @@ export default function AdminPage({ onAuthChange }) {
 
       <button
         className="btn-save"
-        onClick={() => {
-          const json = JSON.stringify(settings.recipients)
-          navigator.clipboard?.writeText(json)?.then(() => {
-            alert('수신자 JSON이 복사되었습니다.\n\nRender 대시보드 > Environment 탭에서\nRECIPIENTS 환경변수 값에 붙여넣기 하세요.')
-          }).catch(() => {
-            prompt('아래 값을 복사하여 Render RECIPIENTS 환경변수에 붙여넣으세요:', json)
-          })
-          saveAdminSettings(settings)
-          setSaved(true)
-          setTimeout(() => setSaved(false), 2000)
-        }}
+        onClick={handleSave}
       >
-        {saved ? '저장 완료!' : '수신자 JSON 복사 + 저장'}
+        {saved ? '저장 완료!' : '설정 저장'}
       </button>
 
       {/* 계정 관리 */}

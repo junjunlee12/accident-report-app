@@ -1,10 +1,9 @@
 /**
  * 사고발생보고서 이메일 발송 백엔드 서버
  *
- * 환경변수 설정 (Render 대시보드에서):
- *   GMAIL_USER=발송용Gmail주소
- *   GMAIL_APP_PASSWORD=구글앱비밀번호16자리
- *   RECIPIENTS=JSON문자열 (수신자 목록)
+ * 환경변수:
+ *   MONGODB_URI=mongodb+srv://... (MongoDB Atlas 연결 문자열)
+ *   PORT=3001 (선택)
  */
 
 const express = require('express')
@@ -12,36 +11,56 @@ const cors = require('cors')
 const nodemailer = require('nodemailer')
 const multer = require('multer')
 const path = require('path')
+const { MongoClient } = require('mongodb')
 
 const app = express()
 const upload = multer({ storage: multer.memoryStorage() })
 
 app.use(cors())
 app.use(express.json({ limit: '50mb' }))
-
-// 프론트엔드 정적 파일 서빙
 app.use(express.static(path.join(__dirname, 'public')))
 
-// ===== 환경변수에서 설정 읽기 (영구 유지) =====
-function getSmtpConfig() {
-  return {
-    email: process.env.GMAIL_USER || '',
-    appPassword: process.env.GMAIL_APP_PASSWORD || ''
-  }
-}
+// ===== MongoDB 연결 =====
+let db = null
 
-function getRecipients() {
+async function connectDB() {
+  const uri = process.env.MONGODB_URI
+  if (!uri) {
+    console.error('MONGODB_URI 환경변수가 설정되지 않았습니다.')
+    return
+  }
   try {
-    if (process.env.RECIPIENTS) {
-      return JSON.parse(process.env.RECIPIENTS)
-    }
+    const client = new MongoClient(uri)
+    await client.connect()
+    db = client.db('accident-report')
+    console.log('MongoDB 연결 성공')
   } catch (e) {
-    console.error('수신자 설정 파싱 오류:', e)
+    console.error('MongoDB 연결 실패:', e.message)
   }
-  return {}
 }
 
-// 동적 transporter 생성
+// 설정 읽기
+async function loadSettings() {
+  if (!db) return null
+  try {
+    return await db.collection('settings').findOne({ _id: 'admin_settings' })
+  } catch (e) {
+    console.error('설정 읽기 실패:', e)
+    return null
+  }
+}
+
+// 설정 저장
+async function saveSettings(settings) {
+  if (!db) throw new Error('데이터베이스가 연결되지 않았습니다.')
+  await db.collection('settings').updateOne(
+    { _id: 'admin_settings' },
+    { $set: { ...settings, _id: 'admin_settings', updatedAt: new Date() } },
+    { upsert: true }
+  )
+}
+
+// transporter 생성
 function createTransporter(smtpConfig) {
   return nodemailer.createTransport({
     service: 'gmail',
@@ -54,23 +73,31 @@ function createTransporter(smtpConfig) {
 
 // ===== 설정 API =====
 
-// 관리자 설정 조회
-app.get('/api/settings', (req, res) => {
-  const smtp = getSmtpConfig()
-  const recipients = getRecipients()
-  const configured = !!(smtp.email && smtp.appPassword)
+// 관리자 설정 저장
+app.post('/api/settings', async (req, res) => {
+  try {
+    await saveSettings(req.body)
+    res.json({ success: true, message: '설정이 저장되었습니다.' })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '설정 저장 실패: ' + error.message })
+  }
+})
 
-  res.json({
-    success: configured,
-    settings: {
-      smtp: {
-        email: smtp.email ? smtp.email.replace(/(.{3}).*(@.*)/, '$1***$2') : '',
-        configured: configured
-      },
-      recipients,
-      notificationMethod: 'email'
+// 관리자 설정 조회
+app.get('/api/settings', async (req, res) => {
+  const settings = await loadSettings()
+  if (settings?.smtp?.email) {
+    // 비밀번호는 마스킹해서 보내기
+    const safe = { ...settings }
+    safe.smtp = {
+      ...safe.smtp,
+      appPassword: safe.smtp.appPassword ? '********' : '',
+      configured: !!(safe.smtp.email && safe.smtp.appPassword)
     }
-  })
+    res.json({ success: true, settings: safe })
+  } else {
+    res.json({ success: false, settings: null })
+  }
 })
 
 // ===== 보고서 제출 + 이메일 발송 =====
@@ -79,18 +106,15 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
     const { reportSummary } = JSON.parse(req.body.data)
     const pdfBuffer = req.file?.buffer
 
-    // 환경변수에서 설정 읽기
-    const smtp = getSmtpConfig()
-    if (!smtp.email || !smtp.appPassword) {
+    const settings = await loadSettings()
+    if (!settings?.smtp?.email || !settings?.smtp?.appPassword) {
       return res.status(400).json({
         success: false,
         message: '관리자가 Gmail 발송 설정을 아직 완료하지 않았습니다. 관리자에게 문의하세요.'
       })
     }
 
-    // 해당 사업명의 수신자 찾기
-    const allRecipients = getRecipients()
-    const recipients = allRecipients[reportSummary.projectName] || []
+    const recipients = settings.recipients?.[reportSummary.projectName] || []
     const emailList = recipients.map(r => r.email).filter(Boolean)
 
     if (emailList.length === 0) {
@@ -100,10 +124,10 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
       })
     }
 
-    const transporter = createTransporter(smtp)
+    const transporter = createTransporter(settings.smtp)
 
     const mailOptions = {
-      from: `"매립운영처 사고보고시스템" <${smtp.email}>`,
+      from: `"매립운영처 사고보고시스템" <${settings.smtp.email}>`,
       to: emailList.join(', '),
       subject: `[사고발생보고] ${reportSummary.projectName} - ${reportSummary.name} (${reportSummary.date})`,
       html: `
@@ -154,15 +178,15 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
 // 이메일 설정 테스트 API
 app.post('/api/test-email', async (req, res) => {
   try {
-    const smtp = getSmtpConfig()
-    if (!smtp.email || !smtp.appPassword) {
-      return res.status(400).json({ success: false, message: 'Gmail 환경변수가 설정되지 않았습니다.' })
+    const settings = await loadSettings()
+    if (!settings?.smtp?.email || !settings?.smtp?.appPassword) {
+      return res.status(400).json({ success: false, message: 'Gmail 설정이 없습니다. 관리자 페이지에서 설정을 저장하세요.' })
     }
 
-    const transporter = createTransporter(smtp)
+    const transporter = createTransporter(settings.smtp)
     await transporter.sendMail({
-      from: `"매립운영처 사고보고시스템" <${smtp.email}>`,
-      to: req.body.testTo || smtp.email,
+      from: `"매립운영처 사고보고시스템" <${settings.smtp.email}>`,
+      to: req.body.testTo || settings.smtp.email,
       subject: '[테스트] 사고보고시스템 이메일 발송 테스트',
       text: '이 메일이 수신되었다면 이메일 설정이 정상적으로 완료된 것입니다.'
     })
@@ -175,7 +199,7 @@ app.post('/api/test-email', async (req, res) => {
 
 // 서버 상태 확인
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+  res.json({ status: 'ok', db: !!db, timestamp: new Date().toISOString() })
 })
 
 // 프론트엔드 라우팅 (SPA)
@@ -183,10 +207,10 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'))
 })
 
+// 서버 시작
 const PORT = process.env.PORT || 3001
-app.listen(PORT, () => {
-  console.log(`사고보고서 서버가 포트 ${PORT}에서 실행 중입니다.`)
-  const smtp = getSmtpConfig()
-  console.log(`Gmail 설정: ${smtp.email ? '완료' : '미설정'}`)
-  console.log(`수신자 설정: ${Object.keys(getRecipients()).length > 0 ? '완료' : '미설정'}`)
+connectDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`사고보고서 서버가 포트 ${PORT}에서 실행 중입니다.`)
+  })
 })
