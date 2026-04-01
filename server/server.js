@@ -11,12 +11,16 @@ const express = require('express')
 const cors = require('cors')
 const nodemailer = require('nodemailer')
 const multer = require('multer')
+const path = require('path')
 
 const app = express()
 const upload = multer({ storage: multer.memoryStorage() })
 
 app.use(cors())
 app.use(express.json({ limit: '50mb' }))
+
+// 프론트엔드 정적 파일 서빙
+app.use(express.static(path.join(__dirname, 'public')))
 
 // 동적 transporter 생성 (앱에서 전달받은 Gmail 설정 사용)
 function createTransporter(smtpConfig) {
@@ -127,6 +131,11 @@ app.post('/api/test-email', async (req, res) => {
 // 서버 상태 확인
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
+// 프론트엔드 라우팅 (SPA - 모든 경로를 index.html로)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'))
 })
 
 const PORT = process.env.PORT || 3001

@@ -150,7 +150,7 @@ export default function ReportForm() {
         }
       }))
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      const API_URL = import.meta.env.VITE_API_URL || ''
       const res = await fetch(`${API_URL}/api/submit-report`, {
         method: 'POST',
         body: formData
