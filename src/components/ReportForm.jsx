@@ -123,11 +123,17 @@ export default function ReportForm() {
 
     try {
       const displayCompany = getDisplayCompany()
-      const report = saveReport({ ...form, displayCompany })
-      setSubmittedReport(report)
 
-      const pdfBlob = await generatePDF(report)
-      const result = await sendNotification(report, pdfBlob)
+      // 사진 데이터는 로컬 저장에서 제외 (용량 초과 방지)
+      const reportForSave = { ...form, displayCompany, photos: [] }
+      reportForSave.photoCount = form.photos.length
+      const report = saveReport(reportForSave)
+      setSubmittedReport({ ...report, photos: form.photos })
+
+      // PDF에는 사진 포함
+      const reportWithPhotos = { ...report, photos: form.photos }
+      const pdfBlob = await generatePDF(reportWithPhotos)
+      const result = await sendNotification(reportWithPhotos, pdfBlob)
 
       setSendResult(result)
       setShowModal(true)
