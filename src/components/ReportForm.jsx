@@ -3,43 +3,27 @@ import { saveReport, getAdminSettings } from '../utils/storage'
 import { generatePDF } from '../utils/pdfGenerator'
 
 const PROJECT_OPTIONS = [
+  '수도권매립지관리공사',
   '제3매립장(1단계) 매립작업 및 부대공사',
   '수도권매립지 계측관리 용역',
   '통합계량대 인프라 유지관리용역',
 ]
 
 const COMPANY_OPTIONS = [
+  { label: '매립운영처', base: '매립운영처', project: '수도권매립지관리공사' },
+  { label: '주민감시요원', base: '주민감시요원', project: '수도권매립지관리공사' },
   { label: '(주)대우건설(하도급 포함)', base: '(주)대우건설', project: '제3매립장(1단계) 매립작업 및 부대공사' },
   { label: '(주)테스콤(하도급 포함)', base: '(주)테스콤', project: '수도권매립지 계측관리 용역' },
   { label: '(주)투비콤(하도급 포함)', base: '(주)투비콤', project: '통합계량대 인프라 유지관리용역' },
 ]
 
-export default function ReportForm() {
+export default function ReportForm({ formData, setFormData, initialForm }) {
   const fileInputRef = useRef(null)
   const [showModal, setShowModal] = useState(false)
   const [submittedReport, setSubmittedReport] = useState(null)
 
-  const [form, setForm] = useState({
-    projectName: '',
-    company: '',
-    subContractor: '',
-    location: '',
-    date: '',
-    time: '',
-    rank: '',
-    name: '',
-    phone: '',
-    birthDate: '',
-    workExperienceYears: '',
-    workExperienceMonths: '',
-    description: '',
-    damageHuman: false,
-    damageHumanDetail: '',
-    damageProperty: false,
-    damagePropertyDetail: '',
-    action: '',
-    photos: [],
-  })
+  const form = formData
+  const setForm = setFormData
 
   const update = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -234,13 +218,7 @@ export default function ReportForm() {
   }
 
   const resetForm = () => {
-    setForm({
-      projectName: '', company: '', subContractor: '', location: '',
-      date: '', time: '', rank: '', name: '', phone: '', birthDate: '',
-      workExperienceYears: '', workExperienceMonths: '',
-      description: '', damageHuman: false, damageHumanDetail: '',
-      damageProperty: false, damagePropertyDetail: '',
-      action: '', photos: [],
+    setForm({ ...initialForm
     })
     setShowModal(false)
     setSubmittedReport(null)

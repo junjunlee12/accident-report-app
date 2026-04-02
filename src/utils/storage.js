@@ -52,6 +52,7 @@ export function saveAdminSettings(settings) {
 function getDefaultAdminSettings() {
   return {
     recipients: {
+      '수도권매립지관리공사': [{ name: '', email: '' }],
       '제3매립장(1단계) 매립작업 및 부대공사': [{ name: '', email: '' }],
       '수도권매립지 계측관리 용역': [{ name: '', email: '' }],
       '통합계량대 인프라 유지관리용역': [{ name: '', email: '' }],

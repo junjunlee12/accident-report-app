@@ -7,10 +7,20 @@ import AdminLogin from './components/AdminLogin'
 import { isAdmin, logoutAdmin } from './utils/auth'
 import './App.css'
 
+const INITIAL_FORM = {
+  projectName: '', company: '', subContractor: '', location: '',
+  date: '', time: '', rank: '', name: '', phone: '', birthDate: '',
+  workExperienceYears: '', workExperienceMonths: '',
+  description: '', damageHuman: false, damageHumanDetail: '',
+  damageProperty: false, damagePropertyDetail: '',
+  action: '', photos: [],
+}
+
 function App() {
   const location = useLocation()
   const [adminLoggedIn, setAdminLoggedIn] = useState(isAdmin())
   const [showLoginModal, setShowLoginModal] = useState(false)
+  const [formData, setFormData] = useState(INITIAL_FORM)
 
   const handleAdminChange = () => {
     setAdminLoggedIn(isAdmin())
@@ -65,7 +75,13 @@ function App() {
 
       <main className="app-main">
         <Routes>
-          <Route path="/" element={<ReportForm />} />
+          <Route path="/" element={
+            <ReportForm
+              formData={formData}
+              setFormData={setFormData}
+              initialForm={INITIAL_FORM}
+            />
+          } />
           <Route path="/list" element={<ReportList />} />
           <Route path="/admin" element={
             adminLoggedIn
@@ -75,7 +91,6 @@ function App() {
         </Routes>
       </main>
 
-      {/* 관리자 로그인 모달 */}
       {showLoginModal && (
         <div className="modal-overlay" onClick={() => setShowLoginModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>

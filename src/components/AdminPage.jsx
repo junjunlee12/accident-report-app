@@ -3,6 +3,7 @@ import { getAdminSettings, saveAdminSettings } from '../utils/storage'
 import { logoutAdmin, changeAdminCredentials, transferAdmin } from '../utils/auth'
 
 const PROJECT_NAMES = [
+  '수도권매립지관리공사',
   '제3매립장(1단계) 매립작업 및 부대공사',
   '수도권매립지 계측관리 용역',
   '통합계량대 인프라 유지관리용역',
