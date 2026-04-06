@@ -99,6 +99,7 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
 
   const validate = () => {
     const missing = []
+    if (form.isVehicleAccident && !form.vehicleNumber) missing.push('차량번호')
     if (!form.projectName) missing.push('사업명')
     if (!form.company) missing.push('소속')
     if (!form.location) missing.push('발생장소')
@@ -228,6 +229,33 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
 
   return (
     <div>
+      {/* 업무용 차량 사고 체크박스 */}
+      <div className="form-section" style={{ background: form.isVehicleAccident ? '#fffff0' : '#fff' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={form.isVehicleAccident}
+            onChange={e => update('isVehicleAccident', e.target.checked)}
+            style={{ width: '22px', height: '22px', accentColor: '#d69e2e' }}
+          />
+          <span style={{ fontSize: '15px', fontWeight: '700', color: '#975a16' }}>
+            업무용 차량 사고
+          </span>
+        </label>
+        {form.isVehicleAccident && (
+          <div className="form-group" style={{ marginTop: '12px' }}>
+            <label className="form-label">차량번호 <span className="required">*</span></label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="예: 12가 3456"
+              value={form.vehicleNumber}
+              onChange={e => update('vehicleNumber', e.target.value)}
+            />
+          </div>
+        )}
+      </div>
+
       {/* 1. 사업명 */}
       <div className="form-section">
         <div className="form-section-title">

@@ -1,7 +1,15 @@
 import jsPDF from 'jspdf'
 
-// 한글 폰트를 위해 내장 폰트 대신 유니코드 지원 방식 사용
+// 보고서 유형에 따라 분기
 export async function generatePDF(report) {
+  if (report.isVehicleAccident) {
+    return generateVehiclePDF(report)
+  }
+  return generateAccidentPDF(report)
+}
+
+// ===== 산업재해 발생보고서 PDF =====
+async function generateAccidentPDF(report) {
   // 한글 폰트 로드
   const doc = new jsPDF('p', 'mm', 'a4')
 
@@ -208,6 +216,209 @@ export async function generatePDF(report) {
         doc.addImage(hCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageWidth, 30)
 
         // 사진 삽입 (이미 리사이즈된 JPEG 데이터)
+        const w = photo.width || 800
+        const h = photo.height || 600
+        const maxW = 180
+        const maxH = 230
+        const ratio = Math.min(maxW / w, maxH / h)
+        const pdfW = w * ratio
+        const pdfH = h * ratio
+        const xOffset = (pageWidth - pdfW) / 2
+
+        doc.addImage(photo.data, 'JPEG', xOffset, 35, pdfW, pdfH)
+      } catch (e) {
+        console.error('사진 추가 실패:', i, e)
+      }
+    }
+  }
+
+  return doc.output('blob')
+}
+
+// ===== 차량 사고 보고서 PDF =====
+async function generateVehiclePDF(report) {
+  const doc = new jsPDF('p', 'mm', 'a4')
+
+  const canvas = document.createElement('canvas')
+  const scale = 3
+  const pageWidth = 210
+  const pageHeight = 297
+  canvas.width = pageWidth * scale
+  canvas.height = pageHeight * scale
+  const ctx = canvas.getContext('2d')
+
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  const mm = (val) => val * scale
+  let y = 20
+
+  const drawText = (text, x, yPos, options = {}) => {
+    const { fontSize = 10, fontWeight = 'normal', color = '#000', align = 'left' } = options
+    ctx.font = `${fontWeight} ${mm(fontSize * 0.35)}px 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif`
+    ctx.fillStyle = color
+    ctx.textAlign = align
+    ctx.fillText(text, mm(x), mm(yPos))
+    ctx.textAlign = 'left'
+  }
+
+  const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
+    const chars = text.split('')
+    let line = ''
+    let currentY = y
+    for (let i = 0; i < chars.length; i++) {
+      const testLine = line + chars[i]
+      if (context.measureText(testLine).width > maxWidth && i > 0) {
+        context.fillText(line, x, currentY)
+        line = chars[i]
+        currentY += lineHeight
+      } else {
+        line = testLine
+      }
+    }
+    context.fillText(line, x, currentY)
+    return currentY
+  }
+
+  const drawRect = (x, yPos, w, h) => {
+    ctx.strokeStyle = '#000'
+    ctx.lineWidth = mm(0.3)
+    ctx.strokeRect(mm(x), mm(yPos), mm(w), mm(h))
+  }
+
+  const drawFilledRect = (x, yPos, w, h, color) => {
+    ctx.fillStyle = color
+    ctx.fillRect(mm(x), mm(yPos), mm(w), mm(h))
+  }
+
+  // 제목
+  drawText('차 량 사 고 보 고 서', 105, y, { fontSize: 18, fontWeight: 'bold', align: 'center' })
+  ctx.beginPath()
+  ctx.strokeStyle = '#000'
+  ctx.lineWidth = mm(0.5)
+  ctx.moveTo(mm(55), mm(y + 2))
+  ctx.lineTo(mm(155), mm(y + 2))
+  ctx.stroke()
+
+  y += 15
+
+  const leftCol = 20
+  const labelWidth = 30
+  const tableWidth = 170
+  const contentStart = leftCol + labelWidth
+
+  // 행 그리기
+  const drawRow = (label, content, height = 12) => {
+    drawRect(leftCol, y, tableWidth, height)
+    drawRect(leftCol, y, labelWidth, height)
+    drawFilledRect(leftCol + 0.15, y + 0.15, labelWidth - 0.3, height - 0.3, '#f0f4f8')
+    drawText(label, leftCol + 3, y + height / 2 + 1.5, { fontSize: 10, fontWeight: 'bold' })
+
+    // 내용 텍스트 래핑
+    ctx.font = `normal ${mm(10 * 0.35)}px 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif`
+    ctx.fillStyle = '#000'
+    wrapText(ctx, content || '', mm(contentStart + 3), mm(y + 6), mm(tableWidth - labelWidth - 6), mm(5))
+
+    y += height
+  }
+
+  // 소속 / 차량번호 / 운전원 (3열)
+  const col1W = 30
+  const col2W = 55
+  const col3LabelW = 25
+  const col3W = tableWidth - col1W - col2W - col3LabelW
+  const headerH = 12
+
+  // 소속
+  drawRect(leftCol, y, col1W, headerH)
+  drawFilledRect(leftCol + 0.15, y + 0.15, col1W - 0.3, headerH - 0.3, '#f0f4f8')
+  drawText('소  속', leftCol + 3, y + 7.5, { fontSize: 10, fontWeight: 'bold' })
+
+  drawRect(leftCol + col1W, y, col2W, headerH)
+  drawText(report.displayCompany || report.company || '', leftCol + col1W + 3, y + 7.5, { fontSize: 10 })
+
+  // 차량번호
+  drawRect(leftCol + col1W + col2W, y, col3LabelW, headerH)
+  drawFilledRect(leftCol + col1W + col2W + 0.15, y + 0.15, col3LabelW - 0.3, headerH - 0.3, '#f0f4f8')
+  drawText('차량번호', leftCol + col1W + col2W + 3, y + 7.5, { fontSize: 10, fontWeight: 'bold' })
+
+  drawRect(leftCol + col1W + col2W + col3LabelW, y, col3W, headerH)
+  drawText(report.vehicleNumber || '', leftCol + col1W + col2W + col3LabelW + 3, y + 7.5, { fontSize: 10 })
+
+  y += headerH
+
+  // 운전원 행 추가
+  drawRect(leftCol, y, col1W, headerH)
+  drawFilledRect(leftCol + 0.15, y + 0.15, col1W - 0.3, headerH - 0.3, '#f0f4f8')
+  drawText('운전원', leftCol + 3, y + 7.5, { fontSize: 10, fontWeight: 'bold' })
+
+  drawRect(leftCol + col1W, y, tableWidth - col1W, headerH)
+  const driverInfo = `${report.rank || ''} ${report.name || ''} (${report.phone || ''})`.trim()
+  drawText(driverInfo, leftCol + col1W + 3, y + 7.5, { fontSize: 10 })
+
+  y += headerH
+
+  // 사고 발생일자
+  let dateDisplay = ''
+  if (report.date) {
+    const d = new Date(report.date)
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+    dateDisplay = `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${report.time || ''} (${dayNames[d.getDay()]}요일)`
+  }
+  drawRow('사    고\n발생일자', dateDisplay, 16)
+
+  // 발생장소
+  drawRow('발생장소', report.location || '', 20)
+
+  // 발생상황 (발생경위 자동생성 + 직접기입)
+  const autoDesc = buildAutoDescription(report)
+  const fullDesc = autoDesc + (report.description ? ' ' + report.description : '')
+  drawRow('발생상황', fullDesc, 35)
+
+  // 사고원인 (발생경위 직접기입 부분)
+  drawRow('사고원인', report.description || '', 30)
+
+  // 주요 피해내용
+  let damageText = ''
+  if (report.damageHuman) damageText += `[인명피해] ${report.damageHumanDetail || ''}`
+  if (report.damageProperty) damageText += `${damageText ? '\n' : ''}[물적피해] ${report.damagePropertyDetail || ''}`
+  drawRow('주    요\n피해내용', damageText || '해당없음', 30)
+
+  // 기타 조치 및 요구사항
+  drawRow('기타 조치 및\n요구사항', report.action || '', 30)
+
+  // 보고일시 / 보고자
+  y += 5
+  if (report.date) {
+    const d = new Date(report.date)
+    drawText(`보고일시 :          ${d.getFullYear()}년          ${d.getMonth() + 1}월          ${d.getDate()}일`, 105, y + 5, { fontSize: 10, align: 'center' })
+  }
+  drawText('보고자 : 매립운영처장                       (인)', 105, y + 12, { fontSize: 10, align: 'center' })
+
+  // Canvas → PDF
+  const imgData = canvas.toDataURL('image/jpeg', 0.95)
+  doc.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight)
+
+  // 사진 페이지 추가
+  if (report.photos && report.photos.length > 0) {
+    for (let i = 0; i < report.photos.length; i++) {
+      try {
+        const photo = report.photos[i]
+        if (!photo || !photo.data) continue
+
+        doc.addPage()
+
+        const hCanvas = document.createElement('canvas')
+        hCanvas.width = pageWidth * scale
+        hCanvas.height = 30 * scale
+        const hCtx = hCanvas.getContext('2d')
+        hCtx.fillStyle = '#ffffff'
+        hCtx.fillRect(0, 0, hCanvas.width, hCanvas.height)
+        hCtx.font = `bold ${mm(12 * 0.35)}px 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif`
+        hCtx.fillStyle = '#1a365d'
+        hCtx.fillText(`첨부사진 ${i + 1}/${report.photos.length}`, mm(15), mm(20))
+        doc.addImage(hCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageWidth, 30)
+
         const w = photo.width || 800
         const h = photo.height || 600
         const maxW = 180

@@ -8,6 +8,7 @@ import { isAdmin, logoutAdmin } from './utils/auth'
 import './App.css'
 
 const INITIAL_FORM = {
+  isVehicleAccident: false, vehicleNumber: '',
   projectName: '', company: '', subContractor: '', location: '',
   date: '', time: '', rank: '', name: '', phone: '', birthDate: '',
   workExperienceYears: '', workExperienceMonths: '',
