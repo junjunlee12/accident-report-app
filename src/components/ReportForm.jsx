@@ -159,6 +159,7 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
       formData.append('pdf', pdfBlob, `사고발생보고서_${report.name}_${report.date}.pdf`)
       formData.append('data', JSON.stringify({
         reportSummary: {
+          isVehicleAccident: report.isVehicleAccident,
           projectName: report.projectName,
           company: report.displayCompany,
           subContractor: report.subContractor,

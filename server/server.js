@@ -134,7 +134,9 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
       })
     }
 
-    const recipients = settings.recipients?.[reportSummary.projectName] || []
+    // 차량사고면 '업무용차량사고' 수신자, 아니면 사업명별 수신자
+    const recipientKey = reportSummary.isVehicleAccident ? '업무용차량사고' : reportSummary.projectName
+    const recipients = settings.recipients?.[recipientKey] || []
     const emailList = recipients.map(r => r.email).filter(Boolean)
 
     if (emailList.length === 0) {

@@ -28,6 +28,7 @@ export default function ReportList() {
       formData.append('pdf', pdfBlob, `사고발생보고서_${report.name}_${report.date}.pdf`)
       formData.append('data', JSON.stringify({
         reportSummary: {
+          isVehicleAccident: report.isVehicleAccident,
           projectName: report.projectName,
           company: report.displayCompany || report.company,
           subContractor: report.subContractor,
