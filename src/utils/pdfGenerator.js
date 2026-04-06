@@ -307,12 +307,19 @@ async function generateVehiclePDF(report) {
   const tableWidth = 170
   const contentStart = leftCol + labelWidth
 
-  // 행 그리기
+  // 행 그리기 (라벨 줄바꿈 지원)
   const drawRow = (label, content, height = 12) => {
     drawRect(leftCol, y, tableWidth, height)
     drawRect(leftCol, y, labelWidth, height)
     drawFilledRect(leftCol + 0.15, y + 0.15, labelWidth - 0.3, height - 0.3, '#f0f4f8')
-    drawText(label, leftCol + 3, y + height / 2 + 1.5, { fontSize: 10, fontWeight: 'bold' })
+
+    // 라벨 줄바꿈 처리
+    const labelLines = label.split('\n')
+    const labelLineHeight = 5
+    const labelStartY = y + (height / 2) - ((labelLines.length - 1) * labelLineHeight / 2) + 1.5
+    labelLines.forEach((line, i) => {
+      drawText(line, leftCol + 3, labelStartY + i * labelLineHeight, { fontSize: 10, fontWeight: 'bold' })
+    })
 
     // 내용 텍스트 래핑
     ctx.font = `normal ${mm(10 * 0.35)}px 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif`
@@ -365,7 +372,7 @@ async function generateVehiclePDF(report) {
     const dayNames = ['일', '월', '화', '수', '목', '금', '토']
     dateDisplay = `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${report.time || ''} (${dayNames[d.getDay()]}요일)`
   }
-  drawRow('사    고\n발생일자', dateDisplay, 16)
+  drawRow('사 고\n발생일자', dateDisplay, 16)
 
   // 발생장소
   drawRow('발생장소', report.location || '', 20)
@@ -382,7 +389,7 @@ async function generateVehiclePDF(report) {
   let damageText = ''
   if (report.damageHuman) damageText += `[인명피해] ${report.damageHumanDetail || ''}`
   if (report.damageProperty) damageText += `${damageText ? '\n' : ''}[물적피해] ${report.damagePropertyDetail || ''}`
-  drawRow('주    요\n피해내용', damageText || '해당없음', 30)
+  drawRow('주 요\n피해내용', damageText || '해당없음', 30)
 
   // 기타 조치 및 요구사항
   drawRow('기타 조치 및\n요구사항', report.action || '', 30)
@@ -448,5 +455,9 @@ function buildAutoDescription(report) {
   const dateStr = report.date || ''
   const timeStr = report.time ? ` ${report.time}` : ''
 
+  // '수도권매립지관리공사'일 경우 '진행 중' 제거
+  if (project === '수도권매립지관리공사') {
+    return `'${project}' '${company}' 소속 '${rank} ${name}'님이 '${loc}'에서 '${dateStr}${timeStr}'에`
+  }
   return `'${project}' 진행 중 '${company}' 소속 '${rank} ${name}'님이 '${loc}'에서 '${dateStr}${timeStr}'에`
 }

@@ -436,7 +436,8 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
         </p>
         <div className="auto-text-preview">
           <span className={form.projectName ? 'filled' : 'placeholder'}>'{auto.project}'</span>
-          {' '}진행 중{' '}
+          {form.projectName !== '수도권매립지관리공사' && ' 진행 중'}
+          {' '}
           <span className={form.company ? 'filled' : 'placeholder'}>
             '{auto.displayCompany}'
           </span>
