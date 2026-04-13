@@ -109,6 +109,7 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
     if (!form.damageHuman && !form.damageProperty) missing.push('피해정도')
     if (!form.action.trim()) missing.push('조치 및 결과')
     if (form.photos.length === 0) missing.push('현장 및 피해사진')
+    if (!form.privacyAgreed) missing.push('개인정보 수집 동의')
     return missing
   }
 
@@ -555,6 +556,58 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
             ))}
           </div>
         )}
+      </div>
+
+      {/* 10. 개인정보 수집 동의 */}
+      <div className="form-section" style={{ border: form.privacyAgreed ? '1px solid #c6f6d5' : '1px solid #e2e8f0' }}>
+        <div className="form-section-title">
+          <span className="num">10</span> 개인정보 수집 동의 <span className="required">*</span>
+        </div>
+        <div
+          onClick={() => update('showPrivacy', !form.showPrivacy)}
+          style={{
+            padding: '10px 12px', background: '#f8fafc', borderRadius: '6px',
+            fontSize: '13px', color: '#2b6cb0', cursor: 'pointer',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginBottom: form.showPrivacy ? '10px' : '0'
+          }}
+        >
+          <span>개인정보 수집 · 이용 동의서 전문 보기</span>
+          <span style={{ fontSize: '16px' }}>{form.showPrivacy ? '▲' : '▼'}</span>
+        </div>
+        {form.showPrivacy && (
+          <div style={{
+            padding: '14px', background: '#fff', border: '1px solid #e2e8f0',
+            borderRadius: '8px', fontSize: '12px', color: '#4a5568',
+            lineHeight: 1.8, marginBottom: '12px', maxHeight: '300px', overflowY: 'auto'
+          }}>
+            <p style={{ fontWeight: '700', fontSize: '14px', textAlign: 'center', marginBottom: '12px', color: '#1a365d' }}>
+              개인정보 수집 · 이용 동의서
+            </p>
+            <p>수도권매립지관리공사는 현장 안전사고 발생 시 신속한 보고 및 재발방지 관리를 위하여 아래와 같이 개인정보를 수집 · 이용하고자 합니다. 「개인정보 보호법」 제15조 제1항 제1호에 따라 정보주체의 동의를 받아 수집하오니, 아래 내용을 충분히 읽으신 후 동의 여부를 결정하여 주시기 바랍니다.</p>
+            <table style={{ width: '100%', borderCollapse: 'collapse', margin: '12px 0', fontSize: '12px' }}>
+              <tbody>
+                <tr><td style={{ padding: '6px 8px', border: '1px solid #e2e8f0', background: '#f0f4f8', fontWeight: '600', width: '100px' }}>수집 목적</td><td style={{ padding: '6px 8px', border: '1px solid #e2e8f0' }}>현장 안전사고 보고, 재해자 보호조치, 재발방지 대책 수립 및 관리</td></tr>
+                <tr><td style={{ padding: '6px 8px', border: '1px solid #e2e8f0', background: '#f0f4f8', fontWeight: '600' }}>수집 항목</td><td style={{ padding: '6px 8px', border: '1px solid #e2e8f0' }}>성명, 소속(업체명), 휴대폰 번호, 사고 관련 상황(사고일시, 장소, 경위, 부상 부위 등)</td></tr>
+                <tr><td style={{ padding: '6px 8px', border: '1px solid #e2e8f0', background: '#f0f4f8', fontWeight: '600' }}>보유 및 이용 기간</td><td style={{ padding: '6px 8px', border: '1px solid #e2e8f0' }}>수집일로부터 3년 (보유기간 경과 후 지체 없이 파기)</td></tr>
+                <tr><td style={{ padding: '6px 8px', border: '1px solid #e2e8f0', background: '#f0f4f8', fontWeight: '600' }}>제3자 대리 입력</td><td style={{ padding: '6px 8px', border: '1px solid #e2e8f0' }}>사고 발생 시 본인이 직접 보고할 수 없는 경우, 현장 관계자가 사고보고 앱을 통해 본인의 개인정보를 대리 입력할 수 있습니다.</td></tr>
+                <tr><td style={{ padding: '6px 8px', border: '1px solid #e2e8f0', background: '#f0f4f8', fontWeight: '600' }}>동의 거부 권리</td><td style={{ padding: '6px 8px', border: '1px solid #e2e8f0' }}>귀하는 위 개인정보 수집·이용에 대한 동의를 거부할 권리가 있습니다. 다만, 동의를 거부하실 경우 사고 발생 시 신속한 보고 및 보호조치에 제한이 있을 수 있습니다.</td></tr>
+              </tbody>
+            </table>
+            <p>본인은 위와 같이 개인정보를 수집·이용하는 것에 동의하며, 사고 발생 시 제3자가 본인의 개인정보를 대리 입력하는 것에 동의합니다.</p>
+          </div>
+        )}
+        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '4px 0' }}>
+          <input
+            type="checkbox"
+            checked={form.privacyAgreed || false}
+            onChange={e => update('privacyAgreed', e.target.checked)}
+            style={{ width: '22px', height: '22px', accentColor: '#1a365d' }}
+          />
+          <span style={{ fontSize: '14px', fontWeight: '600', color: form.privacyAgreed ? '#276749' : '#4a5568' }}>
+            개인정보 수집 · 이용에 동의합니다
+          </span>
+        </label>
       </div>
 
       <button className="submit-btn" onClick={handleSubmit} disabled={submitting}>

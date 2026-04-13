@@ -15,6 +15,7 @@ const INITIAL_FORM = {
   description: '', damageHuman: false, damageHumanDetail: '',
   damageProperty: false, damagePropertyDetail: '',
   action: '', photos: [],
+  showPrivacy: false, privacyAgreed: false,
 }
 
 function App() {
