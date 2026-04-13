@@ -15,7 +15,7 @@ async function generateAccidentPDF(report) {
 
   // 기본 폰트로는 한글 출력이 안 되므로, HTML Canvas 기반으로 PDF 생성
   const canvas = document.createElement('canvas')
-  const scale = 3
+  const scale = 5
   const pageWidth = 210 // A4 mm
   const pageHeight = 297
   canvas.width = pageWidth * scale
@@ -191,8 +191,8 @@ async function generateAccidentPDF(report) {
   drawText('사업명: ' + (report.projectName || ''), leftCol, y + 10, { fontSize: 9, color: '#666' })
 
   // Canvas를 이미지로 변환 후 PDF에 추가
-  const imgData = canvas.toDataURL('image/jpeg', 0.95)
-  doc.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight)
+  const imgData = canvas.toDataURL('image/png')
+  doc.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight)
 
   // 사진이 있으면 별도 페이지에 추가
   if (report.photos && report.photos.length > 0) {
@@ -213,7 +213,7 @@ async function generateAccidentPDF(report) {
         hCtx.font = `bold ${mm(12 * 0.35)}px 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif`
         hCtx.fillStyle = '#1a365d'
         hCtx.fillText(`첨부사진 ${i + 1}/${report.photos.length}`, mm(15), mm(20))
-        doc.addImage(hCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageWidth, 30)
+        doc.addImage(hCanvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, 30)
 
         // 사진 삽입 (이미 리사이즈된 JPEG 데이터)
         const w = photo.width || 800
@@ -240,7 +240,7 @@ async function generateVehiclePDF(report) {
   const doc = new jsPDF('p', 'mm', 'a4')
 
   const canvas = document.createElement('canvas')
-  const scale = 3
+  const scale = 5
   const pageWidth = 210
   const pageHeight = 297
   canvas.width = pageWidth * scale
@@ -403,8 +403,8 @@ async function generateVehiclePDF(report) {
   drawText('보고자 : 매립운영처장                       (인)', 105, y + 12, { fontSize: 10, align: 'center' })
 
   // Canvas → PDF
-  const imgData = canvas.toDataURL('image/jpeg', 0.95)
-  doc.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight)
+  const imgData = canvas.toDataURL('image/png')
+  doc.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight)
 
   // 사진 페이지 추가
   if (report.photos && report.photos.length > 0) {
@@ -424,7 +424,7 @@ async function generateVehiclePDF(report) {
         hCtx.font = `bold ${mm(12 * 0.35)}px 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif`
         hCtx.fillStyle = '#1a365d'
         hCtx.fillText(`첨부사진 ${i + 1}/${report.photos.length}`, mm(15), mm(20))
-        doc.addImage(hCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageWidth, 30)
+        doc.addImage(hCanvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, 30)
 
         const w = photo.width || 800
         const h = photo.height || 600
