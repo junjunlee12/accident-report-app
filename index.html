@@ -112,7 +112,7 @@
         var retryCount = 0;
 
         function checkServer() {
-          fetch('https://accident-report-app.onrender.com/api/health')
+          fetch('https://accident-report-api.onrender.com/api/health')
             .then(function(res) { return res.json(); })
             .then(function() {
               // 서버 응답 성공 → 로딩 화면 숨기기
