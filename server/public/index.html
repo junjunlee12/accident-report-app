@@ -6,11 +6,136 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>사고 발생보고서</title>
+    <style>
+      #loading-screen {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: #ffffff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
+        z-index: 9999;
+        font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+        padding: 40px 20px 20px;
+        box-sizing: border-box;
+      }
+      #loading-screen.hidden {
+        opacity: 0;
+        transition: opacity 0.5s;
+        pointer-events: none;
+      }
+      .loading-top {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .loading-logo {
+        height: 28px;
+        margin-bottom: 30px;
+      }
+      .loading-title {
+        font-size: 22px;
+        font-weight: 800;
+        color: #1a365d;
+        text-align: center;
+        margin-bottom: 6px;
+      }
+      .loading-subtitle {
+        font-size: 14px;
+        color: #718096;
+        text-align: center;
+        margin-bottom: 40px;
+      }
+      .loading-message-box {
+        background: #f0f4f8;
+        border-radius: 12px;
+        padding: 28px 24px;
+        text-align: center;
+        max-width: 320px;
+        width: 100%;
+      }
+      .loading-spinner {
+        width: 36px;
+        height: 36px;
+        border: 4px solid #e2e8f0;
+        border-top: 4px solid #2b6cb0;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 16px;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .loading-text {
+        font-size: 14px;
+        color: #4a5568;
+        line-height: 1.6;
+      }
+      .loading-character {
+        max-height: 180px;
+        width: auto;
+        margin-top: 20px;
+      }
+    </style>
     <script type="module" crossorigin src="/assets/index-CFI7A6Yi.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-ns3sKV5i.css">
   </head>
   <body>
+    <!-- 로딩 화면 -->
+    <div id="loading-screen">
+      <div class="loading-top">
+        <img src="/logo.png" alt="수도권매립지관리공사" class="loading-logo" />
+        <div class="loading-title">사고 발생보고서</div>
+        <div class="loading-subtitle">수도권매립지관리공사 매립운영처</div>
+        <div class="loading-message-box">
+          <div class="loading-spinner"></div>
+          <div class="loading-text">
+            현재 서버를 깨우기 위해<br />
+            로딩 중입니다.<br /><br />
+            잠시만 기다려 주십시오.
+          </div>
+        </div>
+      </div>
+      <img src="/character.png" alt="" class="loading-character" />
+    </div>
+
     <div id="root"></div>
+    <script>
+      // 서버 상태 확인 후 로딩 화면 제거
+      (function() {
+        var loadingScreen = document.getElementById('loading-screen');
+        var maxRetry = 60; // 최대 60초
+        var retryCount = 0;
+
+        function checkServer() {
+          fetch('/api/health')
+            .then(function(res) { return res.json(); })
+            .then(function() {
+              // 서버 응답 성공 → 로딩 화면 숨기기
+              loadingScreen.classList.add('hidden');
+              setTimeout(function() {
+                loadingScreen.style.display = 'none';
+              }, 500);
+            })
+            .catch(function() {
+              retryCount++;
+              if (retryCount < maxRetry) {
+                setTimeout(checkServer, 1000); // 1초마다 재시도
+              } else {
+                document.querySelector('.loading-text').innerHTML =
+                  '서버 연결에 실패했습니다.<br>페이지를 새로고침 해주세요.';
+                document.querySelector('.loading-spinner').style.display = 'none';
+              }
+            });
+        }
+
+        checkServer();
+      })();
+    </script>
   </body>
 </html>
