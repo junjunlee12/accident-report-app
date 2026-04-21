@@ -29,16 +29,22 @@ export default function AdminPage({ onAuthChange }) {
       const API_URL = import.meta.env?.VITE_API_URL || ''
       const res = await fetch(`${API_URL}/api/settings`)
       const data = await res.json()
+
+      // 서버 데이터가 항상 우선 (어떤 기기에서 접속해도 동일)
+      if (data.settings) {
+        setSettings(prev => ({
+          ...prev,
+          ...data.settings,
+          // 기본값이 있는 필드는 서버값이 없으면 기존값 유지
+          projects: data.settings.projects || prev.projects || DEFAULT_PROJECTS,
+          recipients: data.settings.recipients || prev.recipients || {},
+          smtp: data.settings.smtp || prev.smtp || { email: '', appPassword: '' },
+          senderEmail: data.settings.senderEmail || prev.senderEmail || '',
+        }))
+      }
+
       if (data.success) {
         setServerStatus('ok')
-        // 서버에 저장된 projects가 있으면 반영
-        if (data.settings?.projects) {
-          setSettings(prev => ({ ...prev, projects: data.settings.projects }))
-        }
-        // 서버에 저장된 recipients가 있으면 반영
-        if (data.settings?.recipients) {
-          setSettings(prev => ({ ...prev, recipients: data.settings.recipients }))
-        }
       } else {
         setServerStatus('not_configured')
       }
