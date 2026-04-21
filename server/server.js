@@ -120,6 +120,12 @@ app.get('/api/settings', async (req, res) => {
   }
 })
 
+// 사업/소속 구성만 조회 (누구나 접근 가능, 로그인 불필요)
+app.get('/api/projects', async (req, res) => {
+  const settings = await loadSettings()
+  res.json({ projects: settings?.projects || null })
+})
+
 // ===== 보고서 제출 + 이메일 발송 =====
 app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
   try {

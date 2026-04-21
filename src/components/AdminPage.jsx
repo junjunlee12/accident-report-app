@@ -1,25 +1,26 @@
 import { useState, useEffect } from 'react'
 import { getAdminSettings, saveAdminSettings } from '../utils/storage'
 import { logoutAdmin, changeAdminCredentials, transferAdmin } from '../utils/auth'
-
-const PROJECT_NAMES = [
-  '업무용차량사고',
-  '수도권매립지관리공사',
-  '제3매립장(1단계) 매립작업 및 부대공사',
-  '수도권매립지 계측관리 용역',
-  '통합계량대 인프라 유지관리용역',
-]
+import { DEFAULT_PROJECTS, getAllRecipientKeys, SPECIAL_RECIPIENT_KEYS } from '../config/projects'
 
 export default function AdminPage({ onAuthChange }) {
-  const [settings, setSettings] = useState(getAdminSettings())
+  const [settings, setSettings] = useState(() => {
+    const stored = getAdminSettings()
+    if (!stored.projects) stored.projects = DEFAULT_PROJECTS
+    return stored
+  })
   const [saved, setSaved] = useState(false)
-  const [serverStatus, setServerStatus] = useState('checking') // 'checking', 'ok', 'not_configured', 'error'
+  const [serverStatus, setServerStatus] = useState('checking')
   const [showPwChange, setShowPwChange] = useState(false)
   const [showTransfer, setShowTransfer] = useState(false)
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [newPwConfirm, setNewPwConfirm] = useState('')
   const [pwMessage, setPwMessage] = useState('')
+  const [showProjectEditor, setShowProjectEditor] = useState(false)
+
+  // 사업명 목록 (업무용차량사고 + 사업명들)
+  const PROJECT_NAMES = getAllRecipientKeys(settings.projects)
 
   // 서버 설정 상태 확인
   const checkServerStatus = async () => {
@@ -30,6 +31,14 @@ export default function AdminPage({ onAuthChange }) {
       const data = await res.json()
       if (data.success) {
         setServerStatus('ok')
+        // 서버에 저장된 projects가 있으면 반영
+        if (data.settings?.projects) {
+          setSettings(prev => ({ ...prev, projects: data.settings.projects }))
+        }
+        // 서버에 저장된 recipients가 있으면 반영
+        if (data.settings?.recipients) {
+          setSettings(prev => ({ ...prev, recipients: data.settings.recipients }))
+        }
       } else {
         setServerStatus('not_configured')
       }
@@ -41,6 +50,70 @@ export default function AdminPage({ onAuthChange }) {
   useEffect(() => {
     checkServerStatus()
   }, [])
+
+  // 사업 편집 함수들
+  const addProject = () => {
+    setSettings(prev => ({
+      ...prev,
+      projects: [...prev.projects, { name: '새 사업명', companies: [{ label: '소속명', base: '소속명' }] }]
+    }))
+  }
+
+  const updateProjectName = (idx, newName) => {
+    setSettings(prev => {
+      const updated = { ...prev }
+      updated.projects = [...prev.projects]
+      updated.projects[idx] = { ...updated.projects[idx], name: newName }
+      return updated
+    })
+  }
+
+  const removeProject = (idx) => {
+    if (!confirm('이 사업을 삭제하시겠습니까?')) return
+    setSettings(prev => ({
+      ...prev,
+      projects: prev.projects.filter((_, i) => i !== idx)
+    }))
+  }
+
+  const addCompany = (projectIdx) => {
+    setSettings(prev => {
+      const updated = { ...prev }
+      updated.projects = [...prev.projects]
+      updated.projects[projectIdx] = {
+        ...updated.projects[projectIdx],
+        companies: [...updated.projects[projectIdx].companies, { label: '', base: '' }]
+      }
+      return updated
+    })
+  }
+
+  const updateCompany = (projectIdx, companyIdx, field, value) => {
+    setSettings(prev => {
+      const updated = { ...prev }
+      updated.projects = [...prev.projects]
+      const project = { ...updated.projects[projectIdx] }
+      project.companies = [...project.companies]
+      project.companies[companyIdx] = { ...project.companies[companyIdx], [field]: value }
+      // label 자동 변경 시 base도 같이 업데이트 (하도급 포함 제거 안 한 경우)
+      if (field === 'label' && !project.companies[companyIdx].base) {
+        project.companies[companyIdx].base = value.replace(/\(하도급 포함\)/g, '').trim()
+      }
+      updated.projects[projectIdx] = project
+      return updated
+    })
+  }
+
+  const removeCompany = (projectIdx, companyIdx) => {
+    setSettings(prev => {
+      const updated = { ...prev }
+      updated.projects = [...prev.projects]
+      const project = { ...updated.projects[projectIdx] }
+      project.companies = project.companies.filter((_, i) => i !== companyIdx)
+      updated.projects[projectIdx] = project
+      return updated
+    })
+  }
 
   const updateRecipient = (project, idx, field, value) => {
     setSettings(prev => {
@@ -216,6 +289,105 @@ export default function AdminPage({ onAuthChange }) {
           >
             테스트 이메일 발송
           </button>
+        )}
+      </div>
+
+      {/* 사업/소속 편집 */}
+      <div className="admin-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <h3 style={{ margin: 0 }}>사업명 / 소속 관리</h3>
+          <button
+            className="btn-add"
+            onClick={() => setShowProjectEditor(!showProjectEditor)}
+            style={{ padding: '6px 12px', fontSize: '12px' }}
+          >
+            {showProjectEditor ? '접기' : '편집'}
+          </button>
+        </div>
+        <p style={{ fontSize: '12px', color: '#718096', marginBottom: '12px', lineHeight: 1.5 }}>
+          부서명이나 사업명이 변경되면 여기서 수정하세요.<br />
+          설정 저장 후 모든 사용자에게 자동 반영됩니다.
+        </p>
+
+        {showProjectEditor && (
+          <div>
+            {settings.projects.map((project, pIdx) => (
+              <div key={pIdx} style={{
+                padding: '12px', marginBottom: '10px', background: '#f8fafc',
+                borderRadius: '8px', border: '1px solid #e2e8f0'
+              }}>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#1a365d', minWidth: '50px' }}>사업명</span>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={project.name}
+                    onChange={e => updateProjectName(pIdx, e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    className="btn-remove"
+                    onClick={() => removeProject(pIdx)}
+                    title="사업 삭제"
+                  >
+                    &#x2715;
+                  </button>
+                </div>
+                <div style={{ marginLeft: '12px', paddingLeft: '12px', borderLeft: '2px solid #bee3f8' }}>
+                  <div style={{ fontSize: '12px', color: '#4a5568', marginBottom: '6px', fontWeight: 600 }}>
+                    소속 목록
+                  </div>
+                  {project.companies.map((company, cIdx) => (
+                    <div key={cIdx} style={{ display: 'flex', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="표시명 (예: (주)대우건설(하도급 포함))"
+                        value={company.label}
+                        onChange={e => updateCompany(pIdx, cIdx, 'label', e.target.value)}
+                        style={{ flex: 2, fontSize: '12px' }}
+                      />
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="기본명 (예: (주)대우건설)"
+                        value={company.base}
+                        onChange={e => updateCompany(pIdx, cIdx, 'base', e.target.value)}
+                        style={{ flex: 2, fontSize: '12px' }}
+                      />
+                      {project.companies.length > 1 && (
+                        <button
+                          className="btn-remove"
+                          onClick={() => removeCompany(pIdx, cIdx)}
+                          style={{ padding: '4px 8px', fontSize: '12px' }}
+                        >
+                          &#x2715;
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    className="btn-add"
+                    onClick={() => addCompany(pIdx)}
+                    style={{ fontSize: '11px', padding: '4px 10px', marginTop: '4px' }}
+                  >
+                    + 소속 추가
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button
+              className="btn-add"
+              onClick={addProject}
+              style={{ width: '100%', padding: '10px' }}
+            >
+              + 사업 추가
+            </button>
+            <p style={{ fontSize: '11px', color: '#718096', marginTop: '8px', lineHeight: 1.5 }}>
+              💡 표시명: 드롭다운에 보이는 이름<br />
+              💡 기본명: 보고서/PDF에 "하도급 포함" 제외하고 쓸 이름
+            </p>
+          </div>
         )}
       </div>
 

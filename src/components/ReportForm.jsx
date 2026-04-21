@@ -1,26 +1,30 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { saveReport, getAdminSettings } from '../utils/storage'
 import { generatePDF } from '../utils/pdfGenerator'
-
-const PROJECT_OPTIONS = [
-  '수도권매립지관리공사',
-  '제3매립장(1단계) 매립작업 및 부대공사',
-  '수도권매립지 계측관리 용역',
-  '통합계량대 인프라 유지관리용역',
-]
-
-const COMPANY_OPTIONS = [
-  { label: '매립운영처', base: '매립운영처', project: '수도권매립지관리공사' },
-  { label: '주민감시요원', base: '주민감시요원', project: '수도권매립지관리공사' },
-  { label: '(주)대우건설(하도급 포함)', base: '(주)대우건설', project: '제3매립장(1단계) 매립작업 및 부대공사' },
-  { label: '(주)테스콤(하도급 포함)', base: '(주)테스콤', project: '수도권매립지 계측관리 용역' },
-  { label: '(주)투비콤(하도급 포함)', base: '(주)투비콤', project: '통합계량대 인프라 유지관리용역' },
-]
+import { DEFAULT_PROJECTS, getProjectNames, getCompaniesByProject } from '../config/projects'
 
 export default function ReportForm({ formData, setFormData, initialForm }) {
   const fileInputRef = useRef(null)
   const [showModal, setShowModal] = useState(false)
   const [submittedReport, setSubmittedReport] = useState(null)
+  const [projects, setProjects] = useState(DEFAULT_PROJECTS)
+
+  // 서버에서 최신 사업/소속 설정 가져오기 (실패 시 기본값 사용)
+  useEffect(() => {
+    const API_URL = import.meta.env?.VITE_API_URL || ''
+    fetch(`${API_URL}/api/projects`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.projects && Array.isArray(data.projects) && data.projects.length > 0) {
+          setProjects(data.projects)
+        }
+      })
+      .catch(() => {
+        // 서버 연결 실패 시 기본값 유지
+      })
+  }, [])
+
+  const PROJECT_OPTIONS = getProjectNames(projects)
 
   const form = formData
   const setForm = setFormData
@@ -30,13 +34,14 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
   }
 
   const availableCompanies = form.projectName
-    ? COMPANY_OPTIONS.filter(c => c.project === form.projectName)
-    : COMPANY_OPTIONS
+    ? getCompaniesByProject(projects, form.projectName)
+    : projects.flatMap(p => p.companies)
 
   // 발생경위에 표시할 소속명: 하도급 있으면 "(하도급 포함)", 없으면 본업체명만
   const getDisplayCompany = () => {
     if (!form.company) return '(소속)'
-    const matched = COMPANY_OPTIONS.find(c => c.label === form.company)
+    const allCompanies = projects.flatMap(p => p.companies)
+    const matched = allCompanies.find(c => c.label === form.company)
     if (!matched) return form.company
     if (form.subContractor) {
       return `${matched.label}_${form.subContractor}`
