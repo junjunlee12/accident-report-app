@@ -40,13 +40,12 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
   // 발생경위에 표시할 소속명: 하도급 있으면 "(하도급 포함)", 없으면 본업체명만
   const getDisplayCompany = () => {
     if (!form.company) return '(소속)'
-    const allCompanies = projects.flatMap(p => p.companies)
-    const matched = allCompanies.find(c => c.label === form.company)
-    if (!matched) return form.company
+    // 하도급업체명 입력 시: 표시명 그대로 + "_하도급업체명"
     if (form.subContractor) {
-      return `${matched.label}_${form.subContractor}`
+      return `${form.company}_${form.subContractor}`
     }
-    return matched.base
+    // 하도급업체명 미입력 시: "(하도급 포함)" 텍스트만 자동 제거
+    return form.company.replace(/\s*\(\s*하도급\s*포함\s*\)\s*/g, '').trim()
   }
 
   const getAutoDescription = () => {

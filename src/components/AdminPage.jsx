@@ -61,7 +61,7 @@ export default function AdminPage({ onAuthChange }) {
   const addProject = () => {
     setSettings(prev => ({
       ...prev,
-      projects: [...prev.projects, { name: '새 사업명', companies: [{ label: '소속명', base: '소속명' }] }]
+      projects: [...prev.projects, { name: '새 사업명', companies: [{ label: '소속명' }] }]
     }))
   }
 
@@ -88,7 +88,7 @@ export default function AdminPage({ onAuthChange }) {
       updated.projects = [...prev.projects]
       updated.projects[projectIdx] = {
         ...updated.projects[projectIdx],
-        companies: [...updated.projects[projectIdx].companies, { label: '', base: '' }]
+        companies: [...updated.projects[projectIdx].companies, { label: '' }]
       }
       return updated
     })
@@ -348,18 +348,10 @@ export default function AdminPage({ onAuthChange }) {
                       <input
                         type="text"
                         className="form-input"
-                        placeholder="표시명 (예: (주)대우건설(하도급 포함))"
+                        placeholder="소속명 (예: (주)대우건설(하도급 포함))"
                         value={company.label}
                         onChange={e => updateCompany(pIdx, cIdx, 'label', e.target.value)}
-                        style={{ flex: 2, fontSize: '12px' }}
-                      />
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="기본명 (예: (주)대우건설)"
-                        value={company.base}
-                        onChange={e => updateCompany(pIdx, cIdx, 'base', e.target.value)}
-                        style={{ flex: 2, fontSize: '12px' }}
+                        style={{ flex: 1, fontSize: '13px' }}
                       />
                       {project.companies.length > 1 && (
                         <button
@@ -390,8 +382,9 @@ export default function AdminPage({ onAuthChange }) {
               + 사업 추가
             </button>
             <p style={{ fontSize: '11px', color: '#718096', marginTop: '8px', lineHeight: 1.5 }}>
-              💡 표시명: 드롭다운에 보이는 이름<br />
-              💡 기본명: 보고서/PDF에 "하도급 포함" 제외하고 쓸 이름
+              💡 하도급업체가 있는 소속은 이름 뒤에 "(하도급 포함)"을 붙이세요.<br />
+              &nbsp;&nbsp;&nbsp;&nbsp;예: (주)대우건설(하도급 포함)<br />
+              💡 하도급업체명 미입력 시 발생경위에서 "(하도급 포함)"은 자동으로 제거됩니다.
             </p>
           </div>
         )}
