@@ -17,7 +17,7 @@
     <script>
       // 백그라운드에서 API 서버 깨우기 (화면은 즉시 표시)
       (function() {
-        var API_URL = 'https://accident-report-app.onrender.com';
+        var API_URL = 'https://accident-report-api-diyr.onrender.com';
         fetch(API_URL + '/api/health').catch(function() {
           // 첫 시도 실패는 무시. 서버가 깨어나면 자동으로 응답함
           setTimeout(function() {
