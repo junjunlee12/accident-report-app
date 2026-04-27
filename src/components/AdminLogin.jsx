@@ -5,14 +5,22 @@ export default function AdminLogin({ onLogin }) {
   const [id, setId] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    if (loginAdmin(id, password)) {
-      onLogin()
-    } else {
-      setError('아이디 또는 비밀번호가 일치하지 않습니다.')
-      setPassword('')
+    setLoading(true)
+    setError('')
+    try {
+      const result = await loginAdmin(id, password)
+      if (result.success) {
+        onLogin()
+      } else {
+        setError(result.message || '아이디 또는 비밀번호가 일치하지 않습니다.')
+        setPassword('')
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -51,9 +59,10 @@ export default function AdminLogin({ onLogin }) {
         <button
           type="submit"
           className="submit-btn"
+          disabled={loading}
           style={{ maxWidth: '260px', margin: '0 auto', padding: '12px' }}
         >
-          로그인
+          {loading ? '로그인 중...' : '로그인'}
         </button>
       </form>
     </div>

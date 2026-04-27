@@ -4,6 +4,8 @@
  * 환경변수:
  *   MONGODB_URI=mongodb+srv://... (MongoDB Atlas 연결 문자열)
  *   BREVO_API_KEY=xkeysib-... (Brevo API 키)
+ *   ADMIN_TOKEN=관리자_API_보호용_비밀_토큰 (랜덤 문자열)
+ *   ALLOWED_ORIGINS=https://accident-report-app.onrender.com (콤마로 여러개 가능)
  */
 
 const express = require('express')
@@ -15,9 +17,38 @@ const { MongoClient } = require('mongodb')
 const app = express()
 const upload = multer({ storage: multer.memoryStorage() })
 
-app.use(cors())
+// CORS 제한 - 허용된 도메인만
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)
+app.use(cors({
+  origin: function (origin, callback) {
+    // origin이 없는 경우 (서버 간 호출, 같은 도메인 등) 허용
+    if (!origin) return callback(null, true)
+    // 허용 목록 비어있으면 모두 허용 (호환성)
+    if (allowedOrigins.length === 0) return callback(null, true)
+    // 허용 목록에 있으면 통과
+    if (allowedOrigins.includes(origin)) return callback(null, true)
+    // 그 외는 차단
+    callback(new Error('CORS 정책 위반: 허용되지 않은 도메인'))
+  }
+}))
 app.use(express.json({ limit: '50mb' }))
 app.use(express.static(path.join(__dirname, 'public')))
+
+// 관리자 인증 미들웨어 - 토큰 검증
+function requireAdminAuth(req, res, next) {
+  const adminToken = process.env.ADMIN_TOKEN
+  // 환경변수에 토큰 미설정 시 경고 후 통과 (호환성)
+  if (!adminToken) {
+    console.warn('⚠️  ADMIN_TOKEN 환경변수 미설정 - 관리자 API가 무방비 상태입니다')
+    return next()
+  }
+  // 클라이언트가 보낸 토큰 확인
+  const clientToken = req.headers['x-admin-token']
+  if (clientToken === adminToken) {
+    return next()
+  }
+  res.status(401).json({ success: false, message: '관리자 인증이 필요합니다.' })
+}
 
 // ===== MongoDB 연결 =====
 let db = null
@@ -94,9 +125,31 @@ async function sendEmail({ senderEmail, senderName, to, subject, html, attachmen
   return await response.json()
 }
 
+// ===== 관리자 인증 API =====
+
+// 관리자 로그인 (ID/PW 받아서 토큰 발급)
+app.post('/api/admin/login', async (req, res) => {
+  const { id, password } = req.body
+  const settings = await loadSettings()
+  const adminId = settings?.adminId || 'merib'
+  const adminPw = settings?.adminPw || 'slc1000'
+  const adminToken = process.env.ADMIN_TOKEN
+
+  if (!adminToken) {
+    return res.status(500).json({ success: false, message: 'ADMIN_TOKEN 환경변수가 설정되지 않았습니다.' })
+  }
+
+  if (id === adminId && password === adminPw) {
+    res.json({ success: true, token: adminToken })
+  } else {
+    res.status(401).json({ success: false, message: '아이디 또는 비밀번호가 일치하지 않습니다.' })
+  }
+})
+
 // ===== 설정 API =====
 
-app.post('/api/settings', async (req, res) => {
+// 설정 저장 (관리자 전용)
+app.post('/api/settings', requireAdminAuth, async (req, res) => {
   try {
     await saveSettingsToDB(req.body)
     res.json({ success: true, message: '설정이 저장되었습니다.' })
@@ -105,7 +158,8 @@ app.post('/api/settings', async (req, res) => {
   }
 })
 
-app.get('/api/settings', async (req, res) => {
+// 설정 조회 (관리자 전용 - 수신자 이메일 등 민감 정보 포함)
+app.get('/api/settings', requireAdminAuth, async (req, res) => {
   const settings = await loadSettings()
   const hasBrevoKey = !!process.env.BREVO_API_KEY
 
@@ -201,7 +255,7 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
 })
 
 // 이메일 테스트
-app.post('/api/test-email', async (req, res) => {
+app.post('/api/test-email', requireAdminAuth, async (req, res) => {
   try {
     const settings = await loadSettings()
     const testTo = req.body.testTo || settings?.senderEmail

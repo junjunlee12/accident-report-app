@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getAdminSettings, saveAdminSettings } from '../utils/storage'
-import { logoutAdmin, changeAdminCredentials, transferAdmin } from '../utils/auth'
+import { logoutAdmin, changeAdminCredentials, transferAdmin, getAdminToken } from '../utils/auth'
 import { DEFAULT_PROJECTS, getAllRecipientKeys, SPECIAL_RECIPIENT_KEYS } from '../config/projects'
 
 export default function AdminPage({ onAuthChange }) {
@@ -27,7 +27,9 @@ export default function AdminPage({ onAuthChange }) {
     setServerStatus('checking')
     try {
       const API_URL = import.meta.env?.VITE_API_URL || ''
-      const res = await fetch(`${API_URL}/api/settings`)
+      const res = await fetch(`${API_URL}/api/settings`, {
+        headers: { 'X-Admin-Token': getAdminToken() }
+      })
       const data = await res.json()
 
       // 서버 데이터가 항상 우선 (어떤 기기에서 접속해도 동일)
@@ -163,7 +165,10 @@ export default function AdminPage({ onAuthChange }) {
       const API_URL = import.meta.env?.VITE_API_URL || ''
       const res = await fetch(`${API_URL}/api/settings`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Token': getAdminToken()
+        },
         body: JSON.stringify(settings)
       })
       const result = await res.json()
@@ -283,7 +288,10 @@ export default function AdminPage({ onAuthChange }) {
                 const API_URL = import.meta.env?.VITE_API_URL || ''
                 const res = await fetch(`${API_URL}/api/test-email`, {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-Admin-Token': getAdminToken()
+                  },
                   body: JSON.stringify({ testTo: settings.senderEmail })
                 })
                 const result = await res.json()
