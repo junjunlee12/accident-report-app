@@ -45,22 +45,28 @@ async function generateAccidentPDF(report) {
   }
 
   const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
-    const words = text.split('')
-    let line = ''
+    // 엔터(\n) 기준으로 먼저 나눠서 줄바꿈 보존
+    const paragraphs = (text || '').split('\n')
     let currentY = y
 
-    for (let i = 0; i < words.length; i++) {
-      const testLine = line + words[i]
-      const metrics = context.measureText(testLine)
-      if (metrics.width > maxWidth && i > 0) {
-        context.fillText(line, x, currentY)
-        line = words[i]
-        currentY += lineHeight
-      } else {
-        line = testLine
+    paragraphs.forEach((paragraph, pIdx) => {
+      if (pIdx > 0) currentY += lineHeight  // 줄 바꿈
+      const chars = paragraph.split('')
+      let line = ''
+
+      for (let i = 0; i < chars.length; i++) {
+        const testLine = line + chars[i]
+        const metrics = context.measureText(testLine)
+        if (metrics.width > maxWidth && i > 0) {
+          context.fillText(line, x, currentY)
+          line = chars[i]
+          currentY += lineHeight
+        } else {
+          line = testLine
+        }
       }
-    }
-    context.fillText(line, x, currentY)
+      context.fillText(line, x, currentY)
+    })
     return currentY
   }
 
@@ -110,7 +116,10 @@ async function generateAccidentPDF(report) {
   }
 
   // 1. 소속
-  drawRow('소 속', report.displayCompany || report.company || '')
+  const companyDisplay = report.company === '해당없음'
+    ? '-'
+    : (report.displayCompany || report.company || '')
+  drawRow('소 속', companyDisplay)
 
   // 2. 발생장소
   drawRow('발생장소', report.location || '')
@@ -132,11 +141,17 @@ async function generateAccidentPDF(report) {
   drawFilledRect(leftCol + 0.15, y + 0.15, labelWidth - 0.3, personHeight - 0.3, '#f0f4f8')
   drawText('인적사항', leftCol + 3, y + 6, { fontSize: 10, fontWeight: 'bold' })
 
-  // 인적사항 내용
-  drawText(`소속: ${report.company || ''}`, contentStart + 3, y + 5, { fontSize: 9 })
-  drawText(`직급: ${report.rank || ''}  성명: ${report.name || ''}  생년월일: ${report.birthDate || ''}`, contentStart + 3, y + 11, { fontSize: 9 })
-  const expText = `동업무경력: ${report.workExperienceYears || '0'}년 ${report.workExperienceMonths || '0'}월`
-  drawText(expText, contentStart + 100, y + 11, { fontSize: 9 })
+  if (report.personNone) {
+    // 해당없음 표기
+    drawText('-', contentStart + 3, y + personHeight / 2 + 1.5, { fontSize: 10 })
+  } else {
+    // 인적사항 내용
+    const companyForPerson = report.company === '해당없음' ? '-' : (report.company || '')
+    drawText(`소속: ${companyForPerson}`, contentStart + 3, y + 5, { fontSize: 9 })
+    drawText(`직급: ${report.rank || ''}  성명: ${report.name || ''}  생년월일: ${report.birthDate || ''}`, contentStart + 3, y + 11, { fontSize: 9 })
+    const expText = `동업무경력: ${report.workExperienceYears || '0'}년 ${report.workExperienceMonths || '0'}월`
+    drawText(expText, contentStart + 100, y + 11, { fontSize: 9 })
+  }
   y += personHeight
 
   // 5. 발생경위
@@ -157,9 +172,13 @@ async function generateAccidentPDF(report) {
 
   // 6. 피해정도
   let damageText = ''
-  if (report.damageHuman) damageText += `[인명피해] ${report.damageHumanDetail || ''}\n`
-  if (report.damageProperty) damageText += `[물적피해] ${report.damagePropertyDetail || ''}`
-  if (!damageText) damageText = '해당없음'
+  if (report.damageNone) {
+    damageText = '인명피해, 물적피해 없음'
+  } else {
+    if (report.damageHuman) damageText += `[인명피해] ${report.damageHumanDetail || ''}\n`
+    if (report.damageProperty) damageText += `[물적피해] ${report.damagePropertyDetail || ''}`
+    if (!damageText) damageText = '인명피해, 물적피해 없음'
+  }
   const damageHeight = 16
   drawRect(leftCol, y, tableWidth, damageHeight)
   drawRect(leftCol, y, labelWidth, damageHeight)
@@ -263,20 +282,25 @@ async function generateVehiclePDF(report) {
   }
 
   const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
-    const chars = text.split('')
-    let line = ''
+    // 엔터(\n) 기준으로 먼저 나눠서 줄바꿈 보존
+    const paragraphs = (text || '').split('\n')
     let currentY = y
-    for (let i = 0; i < chars.length; i++) {
-      const testLine = line + chars[i]
-      if (context.measureText(testLine).width > maxWidth && i > 0) {
-        context.fillText(line, x, currentY)
-        line = chars[i]
-        currentY += lineHeight
-      } else {
-        line = testLine
+    paragraphs.forEach((paragraph, pIdx) => {
+      if (pIdx > 0) currentY += lineHeight
+      const chars = paragraph.split('')
+      let line = ''
+      for (let i = 0; i < chars.length; i++) {
+        const testLine = line + chars[i]
+        if (context.measureText(testLine).width > maxWidth && i > 0) {
+          context.fillText(line, x, currentY)
+          line = chars[i]
+          currentY += lineHeight
+        } else {
+          line = testLine
+        }
       }
-    }
-    context.fillText(line, x, currentY)
+      context.fillText(line, x, currentY)
+    })
     return currentY
   }
 
@@ -342,7 +366,8 @@ async function generateVehiclePDF(report) {
   drawText('소  속', leftCol + 3, y + 7.5, { fontSize: 10, fontWeight: 'bold' })
 
   drawRect(leftCol + col1W, y, col2W, headerH)
-  drawText(report.displayCompany || report.company || '', leftCol + col1W + 3, y + 7.5, { fontSize: 10 })
+  const vehicleCompany = report.company === '해당없음' ? '-' : (report.displayCompany || report.company || '')
+  drawText(vehicleCompany, leftCol + col1W + 3, y + 7.5, { fontSize: 10 })
 
   // 차량번호
   drawRect(leftCol + col1W + col2W, y, col3LabelW, headerH)
@@ -360,7 +385,9 @@ async function generateVehiclePDF(report) {
   drawText('운전원', leftCol + 3, y + 7.5, { fontSize: 10, fontWeight: 'bold' })
 
   drawRect(leftCol + col1W, y, tableWidth - col1W, headerH)
-  const driverInfo = `${report.rank || ''} ${report.name || ''} (${report.phone || ''})`.trim()
+  const driverInfo = report.personNone
+    ? '-'
+    : `${report.rank || ''} ${report.name || ''} (${report.phone || ''})`.trim()
   drawText(driverInfo, leftCol + col1W + 3, y + 7.5, { fontSize: 10 })
 
   y += headerH
@@ -387,9 +414,14 @@ async function generateVehiclePDF(report) {
 
   // 주요 피해내용
   let damageText = ''
-  if (report.damageHuman) damageText += `[인명피해] ${report.damageHumanDetail || ''}`
-  if (report.damageProperty) damageText += `${damageText ? '\n' : ''}[물적피해] ${report.damagePropertyDetail || ''}`
-  drawRow('주 요\n피해내용', damageText || '해당없음', 30)
+  if (report.damageNone) {
+    damageText = '인명피해, 물적피해 없음'
+  } else {
+    if (report.damageHuman) damageText += `[인명피해] ${report.damageHumanDetail || ''}`
+    if (report.damageProperty) damageText += `${damageText ? '\n' : ''}[물적피해] ${report.damagePropertyDetail || ''}`
+    if (!damageText) damageText = '인명피해, 물적피해 없음'
+  }
+  drawRow('주 요\n피해내용', damageText, 30)
 
   // 기타 조치 및 요구사항
   drawRow('기타 조치 및\n요구사항', report.action || '', 30)
@@ -447,17 +479,31 @@ async function generateVehiclePDF(report) {
 
 function buildAutoDescription(report) {
   const project = report.projectName || ''
+  const isCompanyNone = report.company === '해당없음'
+  const isPersonNone = !!report.personNone
   // displayCompany가 있으면 사용 (하도급 없으면 본업체명만)
-  const company = report.displayCompany || report.company || ''
+  const company = isCompanyNone ? '' : (report.displayCompany || report.company || '')
   const rank = report.rank || ''
   const name = report.name || ''
   const loc = report.location || ''
   const dateStr = report.date || ''
   const timeStr = report.time ? ` ${report.time}` : ''
 
-  // '수도권매립지관리공사'일 경우 '진행 중' 제거
-  if (project === '수도권매립지관리공사') {
-    return `'${project}' '${company}' 소속 '${rank} ${name}'님이 '${loc}'에서 '${dateStr}${timeStr}'에`
+  // 사업명 부분
+  let s = `'${project}'`
+  // 수도권매립지관리공사가 아니면 '진행 중' 추가
+  if (project !== '수도권매립지관리공사') {
+    s += ' 진행 중'
   }
-  return `'${project}' 진행 중 '${company}' 소속 '${rank} ${name}'님이 '${loc}'에서 '${dateStr}${timeStr}'에`
+  // 소속 부분 (해당없음이면 생략)
+  if (!isCompanyNone && company) {
+    s += ` '${company}' 소속`
+  }
+  // 인적사항 부분 (해당없음이면 생략)
+  if (!isPersonNone && name) {
+    s += ` '${rank} ${name}'님이`
+  }
+  // 발생장소, 일시
+  s += ` '${loc}'에서 '${dateStr}${timeStr}'에`
+  return s
 }

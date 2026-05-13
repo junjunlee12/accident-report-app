@@ -33,13 +33,16 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
+  // 소속 목록에 항상 '해당없음' 옵션 추가
+  const NONE_COMPANY = { label: '해당없음', isNone: true }
   const availableCompanies = form.projectName
-    ? getCompaniesByProject(projects, form.projectName)
-    : projects.flatMap(p => p.companies)
+    ? [...getCompaniesByProject(projects, form.projectName), NONE_COMPANY]
+    : [...projects.flatMap(p => p.companies), NONE_COMPANY]
 
   // 발생경위에 표시할 소속명: 하도급 있으면 "(하도급 포함)", 없으면 본업체명만
   const getDisplayCompany = () => {
     if (!form.company) return '(소속)'
+    if (form.company === '해당없음') return ''
     // 하도급업체명 입력 시: 표시명 그대로 + "_하도급업체명"
     if (form.subContractor) {
       return `${form.company}_${form.subContractor}`
@@ -108,9 +111,13 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
     if (!form.company) missing.push('소속')
     if (!form.location) missing.push('발생장소')
     if (!form.date) missing.push('일시')
-    if (!form.name) missing.push('성명')
-    if (!form.phone) missing.push('연락처')
-    if (!form.damageHuman && !form.damageProperty) missing.push('피해정도')
+    // 인적사항: 해당없음 체크하면 통과
+    if (!form.personNone) {
+      if (!form.name) missing.push('성명')
+      if (!form.phone) missing.push('연락처')
+    }
+    // 피해정도: 해당없음 체크하거나 인명/물적 하나 이상 체크
+    if (!form.damageNone && !form.damageHuman && !form.damageProperty) missing.push('피해정도')
     if (!form.action.trim()) missing.push('조치 및 결과')
     if (form.photos.length === 0) missing.push('현장 및 피해사진')
     if (!form.privacyAgreed) missing.push('개인정보 수집 동의')
@@ -298,7 +305,7 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
             <option key={c.label} value={c.label}>{c.label}</option>
           ))}
         </select>
-        {form.company && (
+        {form.company && form.company !== '해당없음' && (
           <div className="sub-input-row">
             <span className="sub-label">하도급업체명:</span>
             <input
@@ -355,80 +362,93 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
 
       {/* 5. 인적사항 */}
       <div className="form-section">
-        <div className="form-section-title">
-          <span className="num">5</span> 인적사항
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">직급</label>
+        <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span><span className="num">5</span> 인적사항</span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 'normal' }}>
             <input
-              type="text"
-              className="form-input"
-              placeholder="직급"
-              value={form.rank}
-              onChange={e => update('rank', e.target.value)}
+              type="checkbox"
+              checked={form.personNone || false}
+              onChange={e => update('personNone', e.target.checked)}
+              style={{ width: '18px', height: '18px', accentColor: '#718096' }}
             />
-          </div>
-          <div className="form-group">
-            <label className="form-label">성명 <span className="required">*</span></label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="성명"
-              value={form.name}
-              onChange={e => update('name', e.target.value)}
-            />
-          </div>
+            <span style={{ fontSize: '13px', color: '#4a5568' }}>해당없음</span>
+          </label>
         </div>
-        <div className="form-group">
-          <label className="form-label">연락처 (전화번호) <span className="required">*</span></label>
-          <input
-            type="tel"
-            className="form-input"
-            placeholder="010-0000-0000"
-            value={form.phone}
-            onChange={e => update('phone', e.target.value)}
-          />
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">생년월일</label>
-            <input
-              type="date"
-              className="form-input"
-              value={form.birthDate}
-              onChange={e => update('birthDate', e.target.value)}
-            />
-          </div>
-        </div>
-        <div className="form-group">
-          <label className="form-label">동업무경력</label>
-          <div className="form-row">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <input
-                type="number"
-                className="form-input"
-                placeholder="0"
-                min="0"
-                value={form.workExperienceYears}
-                onChange={e => update('workExperienceYears', e.target.value)}
-              />
-              <span className="sub-label">년</span>
+        {!form.personNone && (
+          <>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">직급</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="직급"
+                  value={form.rank}
+                  onChange={e => update('rank', e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">성명 <span className="required">*</span></label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="성명"
+                  value={form.name}
+                  onChange={e => update('name', e.target.value)}
+                />
+              </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div className="form-group">
+              <label className="form-label">연락처 (전화번호) <span className="required">*</span></label>
               <input
-                type="number"
+                type="tel"
                 className="form-input"
-                placeholder="0"
-                min="0"
-                max="11"
-                value={form.workExperienceMonths}
-                onChange={e => update('workExperienceMonths', e.target.value)}
+                placeholder="010-0000-0000"
+                value={form.phone}
+                onChange={e => update('phone', e.target.value)}
               />
-              <span className="sub-label">월</span>
             </div>
-          </div>
-        </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">생년월일</label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={form.birthDate}
+                  onChange={e => update('birthDate', e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">동업무경력</label>
+              <div className="form-row">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <input
+                    type="number"
+                    className="form-input"
+                    placeholder="0"
+                    min="0"
+                    value={form.workExperienceYears}
+                    onChange={e => update('workExperienceYears', e.target.value)}
+                  />
+                  <span className="sub-label">년</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <input
+                    type="number"
+                    className="form-input"
+                    placeholder="0"
+                    min="0"
+                    max="11"
+                    value={form.workExperienceMonths}
+                    onChange={e => update('workExperienceMonths', e.target.value)}
+                  />
+                  <span className="sub-label">월</span>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* 6. 발생경위 */}
@@ -442,15 +462,25 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
         <div className="auto-text-preview">
           <span className={form.projectName ? 'filled' : 'placeholder'}>'{auto.project}'</span>
           {form.projectName !== '수도권매립지관리공사' && ' 진행 중'}
+          {form.company && form.company !== '해당없음' && (
+            <>
+              {' '}
+              <span className="filled">'{auto.displayCompany}'</span>
+              {' '}소속
+            </>
+          )}
+          {form.personNone ? (
+            ' '
+          ) : (
+            <>
+              {' '}
+              <span className={form.rank ? 'filled' : 'placeholder'}>'{auto.rank}</span>
+              {' '}
+              <span className={form.name ? 'filled' : 'placeholder'}>{auto.personName}'</span>
+              님이
+            </>
+          )}
           {' '}
-          <span className={form.company ? 'filled' : 'placeholder'}>
-            '{auto.displayCompany}'
-          </span>
-          {' '}소속{' '}
-          <span className={form.rank ? 'filled' : 'placeholder'}>'{auto.rank}</span>
-          {' '}
-          <span className={form.name ? 'filled' : 'placeholder'}>{auto.personName}'</span>
-          님이{' '}
           <span className={form.location ? 'filled' : 'placeholder'}>'{auto.loc}'</span>
           에서{' '}
           <span className={form.date ? 'filled' : 'placeholder'}>'{auto.dateStr}{auto.timeStr}'</span>
@@ -475,10 +505,11 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
             <input
               type="checkbox"
               checked={form.damageHuman}
+              disabled={form.damageNone}
               onChange={e => update('damageHuman', e.target.checked)}
             />
             <span className="checkbox-label">인명피해</span>
-            {form.damageHuman && (
+            {form.damageHuman && !form.damageNone && (
               <input
                 type="text"
                 className="form-input"
@@ -492,10 +523,11 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
             <input
               type="checkbox"
               checked={form.damageProperty}
+              disabled={form.damageNone}
               onChange={e => update('damageProperty', e.target.checked)}
             />
             <span className="checkbox-label">물적피해</span>
-            {form.damageProperty && (
+            {form.damageProperty && !form.damageNone && (
               <input
                 type="text"
                 className="form-input"
@@ -504,6 +536,23 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
                 onChange={e => update('damagePropertyDetail', e.target.value)}
               />
             )}
+          </div>
+          <div className="checkbox-item">
+            <input
+              type="checkbox"
+              checked={form.damageNone || false}
+              onChange={e => {
+                update('damageNone', e.target.checked)
+                if (e.target.checked) {
+                  update('damageHuman', false)
+                  update('damageProperty', false)
+                  update('damageHumanDetail', '')
+                  update('damagePropertyDetail', '')
+                }
+              }}
+              style={{ accentColor: '#718096' }}
+            />
+            <span className="checkbox-label" style={{ color: '#4a5568' }}>해당없음</span>
           </div>
         </div>
       </div>
