@@ -42,6 +42,14 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-top-bar">
+          <a
+            href="https://open.kakao.com/o/gphxVQui"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="admin-toggle-btn notify-btn"
+          >
+            💬 상황알림
+          </a>
           {adminLoggedIn ? (
             <button className="admin-toggle-btn logged-in" onClick={handleLogout}>
               로그아웃
