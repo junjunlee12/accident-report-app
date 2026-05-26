@@ -154,10 +154,11 @@ async function generateAccidentPDF(report) {
   }
   y += personHeight
 
-  // 5. 발생경위
+  // 5. 발생경위 (autoDesc는 \n으로 3줄 구성됨)
   const autoDesc = buildAutoDescription(report)
-  const fullDesc = autoDesc + (report.description ? ' ' + report.description : '')
-  const descHeight = Math.max(40, Math.ceil(fullDesc.length / 30) * 6 + 10)
+  const fullDesc = autoDesc + (report.description ? '\n' + report.description : '')
+  const allLines = fullDesc.split('\n')
+  const descHeight = Math.max(50, allLines.length * 6 + Math.ceil(allLines.reduce((s, l) => s + l.length, 0) / 28) * 5 + 5)
 
   drawRect(leftCol, y, tableWidth, descHeight)
   drawRect(leftCol, y, labelWidth, descHeight)
@@ -406,7 +407,7 @@ async function generateVehiclePDF(report) {
 
   // 발생상황 (발생경위 자동생성 + 직접기입)
   const autoDesc = buildAutoDescription(report)
-  const fullDesc = autoDesc + (report.description ? ' ' + report.description : '')
+  const fullDesc = autoDesc + (report.description ? '\n' + report.description : '')
   drawRow('발생상황', fullDesc, 35)
 
   // 사고원인 (발생경위 직접기입 부분)
@@ -489,21 +490,23 @@ function buildAutoDescription(report) {
   const dateStr = report.date || ''
   const timeStr = report.time ? ` ${report.time}` : ''
 
-  // 사업명 부분
-  let s = `'${project}'`
-  // 수도권매립지관리공사가 아니면 '진행 중' 추가
+  // 1줄: 사업명 [진행 중] [소속] [인적사항]
+  let line1 = `'${project}'`
   if (project !== '수도권매립지관리공사') {
-    s += ' 진행 중'
+    line1 += ' 진행 중'
   }
-  // 소속 부분 (해당없음이면 생략)
   if (!isCompanyNone && company) {
-    s += ` '${company}' 소속`
+    line1 += ` '${company}' 소속`
   }
-  // 인적사항 부분 (해당없음이면 생략)
   if (!isPersonNone && name) {
-    s += ` '${rank} ${name}'님이`
+    line1 += ` '${rank} ${name}'님이`
   }
-  // 발생장소, 일시
-  s += ` '${loc}'에서 '${dateStr}${timeStr}'에`
-  return s
+
+  // 2줄: 발생장소
+  const line2 = `'${loc}'에서`
+
+  // 3줄: 일시
+  const line3 = `'${dateStr}${timeStr}'에`
+
+  return `${line1}\n${line2}\n${line3}`
 }

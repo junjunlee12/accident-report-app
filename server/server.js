@@ -88,6 +88,12 @@ async function saveSettingsToDB(settings) {
   )
 }
 
+// RFC 2047 Base64 인코딩 - 이메일 첨부파일 한글 파일명 깨짐 방지
+function encodeEmailFilename(filename) {
+  const base64 = Buffer.from(filename, 'utf8').toString('base64')
+  return `=?UTF-8?B?${base64}?=`
+}
+
 // ===== Brevo API로 이메일 발송 =====
 async function sendEmail({ senderEmail, senderName, to, subject, html, attachments }) {
   const apiKey = process.env.BREVO_API_KEY
@@ -235,7 +241,7 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
         </div>
       `,
       attachments: pdfBuffer ? [{
-        filename: `사고발생보고서_${reportSummary.name}_${reportSummary.date}.pdf`,
+        filename: encodeEmailFilename(`사고보고서(${reportSummary.date}).pdf`),
         content: pdfBuffer
       }] : []
     })

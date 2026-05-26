@@ -168,7 +168,7 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
   const sendNotification = async (report, pdfBlob) => {
     try {
       const formData = new FormData()
-      formData.append('pdf', pdfBlob, `사고발생보고서_${report.name}_${report.date}.pdf`)
+      formData.append('pdf', pdfBlob, `사고보고서(${report.date}).pdf`)
       formData.append('data', JSON.stringify({
         reportSummary: {
           isVehicleAccident: report.isVehicleAccident,
@@ -202,7 +202,7 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `사고발생보고서_${submittedReport.name}_${submittedReport.date}.pdf`
+      a.download = `사고보고서(${submittedReport.date}).pdf`
       a.click()
       URL.revokeObjectURL(url)
     }
@@ -212,7 +212,7 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
     if (!submittedReport) return
     try {
       const blob = await generatePDF(submittedReport)
-      const fileName = `사고발생보고서_${submittedReport.name}_${submittedReport.date}.pdf`
+      const fileName = `사고보고서(${submittedReport.date}).pdf`
       const file = new File([blob], fileName, { type: 'application/pdf' })
 
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -460,31 +460,35 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
           아래 내용은 위에서 입력한 정보로 자동 생성됩니다.
         </p>
         <div className="auto-text-preview">
-          <span className={form.projectName ? 'filled' : 'placeholder'}>'{auto.project}'</span>
-          {form.projectName !== '수도권매립지관리공사' && ' 진행 중'}
-          {form.company && form.company !== '해당없음' && (
-            <>
-              {' '}
-              <span className="filled">'{auto.displayCompany}'</span>
-              {' '}소속
-            </>
-          )}
-          {form.personNone ? (
-            ' '
-          ) : (
-            <>
-              {' '}
-              <span className={form.rank ? 'filled' : 'placeholder'}>'{auto.rank}</span>
-              {' '}
-              <span className={form.name ? 'filled' : 'placeholder'}>{auto.personName}'</span>
-              님이
-            </>
-          )}
-          {' '}
-          <span className={form.location ? 'filled' : 'placeholder'}>'{auto.loc}'</span>
-          에서{' '}
-          <span className={form.date ? 'filled' : 'placeholder'}>'{auto.dateStr}{auto.timeStr}'</span>
-          에
+          {/* 1줄: 사업명 [소속] [인적사항] */}
+          <div>
+            <span className={form.projectName ? 'filled' : 'placeholder'}>'{auto.project}'</span>
+            {form.projectName !== '수도권매립지관리공사' && ' 진행 중'}
+            {form.company && form.company !== '해당없음' && (
+              <>
+                {' '}
+                <span className="filled">'{auto.displayCompany}'</span>
+                {' '}소속
+              </>
+            )}
+            {!form.personNone && (
+              <>
+                {' '}
+                <span className={form.rank ? 'filled' : 'placeholder'}>'{auto.rank}</span>
+                {' '}
+                <span className={form.name ? 'filled' : 'placeholder'}>{auto.personName}'</span>
+                님이
+              </>
+            )}
+          </div>
+          {/* 2줄: 발생장소 */}
+          <div>
+            <span className={form.location ? 'filled' : 'placeholder'}>'{auto.loc}'</span>에서
+          </div>
+          {/* 3줄: 일시 */}
+          <div>
+            <span className={form.date ? 'filled' : 'placeholder'}>'{auto.dateStr}{auto.timeStr}'</span>에
+          </div>
         </div>
         <textarea
           className="form-textarea"
