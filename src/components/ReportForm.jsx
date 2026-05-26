@@ -3,7 +3,7 @@ import { saveReport, getAdminSettings } from '../utils/storage'
 import { generatePDF } from '../utils/pdfGenerator'
 import { DEFAULT_PROJECTS, getProjectNames, getCompaniesByProject } from '../config/projects'
 
-export default function ReportForm({ formData, setFormData, initialForm }) {
+export default function ReportForm({ formData, setFormData, initialForm, deptId }) {
   const fileInputRef = useRef(null)
   const [showModal, setShowModal] = useState(false)
   const [submittedReport, setSubmittedReport] = useState(null)
@@ -12,7 +12,8 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
   // 서버에서 최신 사업/소속 설정 가져오기 (실패 시 기본값 사용)
   useEffect(() => {
     const API_URL = import.meta.env?.VITE_API_URL || ''
-    fetch(`${API_URL}/api/projects`)
+    const deptParam = deptId ? `?dept=${encodeURIComponent(deptId)}` : ''
+    fetch(`${API_URL}/api/projects${deptParam}`)
       .then(res => res.json())
       .then(data => {
         if (data.projects && Array.isArray(data.projects) && data.projects.length > 0) {
@@ -22,7 +23,7 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
       .catch(() => {
         // 서버 연결 실패 시 기본값 유지
       })
-  }, [])
+  }, [deptId])
 
   const PROJECT_OPTIONS = getProjectNames(projects)
 
@@ -181,6 +182,7 @@ export default function ReportForm({ formData, setFormData, initialForm }) {
           location: report.location,
           date: report.date,
           time: report.time,
+          deptId: deptId || '',
         }
       }))
 

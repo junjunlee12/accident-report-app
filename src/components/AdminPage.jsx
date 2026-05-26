@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { getAdminSettings, saveAdminSettings } from '../utils/storage'
 import { logoutAdmin, changeAdminCredentials, transferAdmin, getAdminToken } from '../utils/auth'
 import { DEFAULT_PROJECTS, getAllRecipientKeys, SPECIAL_RECIPIENT_KEYS } from '../config/projects'
+import { DEPARTMENTS } from '../config/departments'
 
 export default function AdminPage({ onAuthChange }) {
+  const [selectedDept, setSelectedDept] = useState('매립운영처')
   const [settings, setSettings] = useState(() => {
     const stored = getAdminSettings()
     if (!stored.projects) stored.projects = DEFAULT_PROJECTS
@@ -23,11 +25,12 @@ export default function AdminPage({ onAuthChange }) {
   const PROJECT_NAMES = getAllRecipientKeys(settings.projects)
 
   // 서버 설정 상태 확인
-  const checkServerStatus = async () => {
+  const checkServerStatus = async (dept) => {
+    const deptToLoad = dept || selectedDept
     setServerStatus('checking')
     try {
       const API_URL = import.meta.env?.VITE_API_URL || ''
-      const res = await fetch(`${API_URL}/api/settings`, {
+      const res = await fetch(`${API_URL}/api/settings?dept=${encodeURIComponent(deptToLoad)}`, {
         headers: { 'X-Admin-Token': getAdminToken() }
       })
       const data = await res.json()
@@ -42,6 +45,7 @@ export default function AdminPage({ onAuthChange }) {
           recipients: data.settings.recipients || prev.recipients || {},
           smtp: data.settings.smtp || prev.smtp || { email: '', appPassword: '' },
           senderEmail: data.settings.senderEmail || prev.senderEmail || '',
+          kakaoLink: data.settings.kakaoLink || '',
         }))
       }
 
@@ -56,8 +60,9 @@ export default function AdminPage({ onAuthChange }) {
   }
 
   useEffect(() => {
-    checkServerStatus()
-  }, [])
+    checkServerStatus(selectedDept)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDept])
 
   // 사업 편집 함수들
   const addProject = () => {
@@ -163,7 +168,7 @@ export default function AdminPage({ onAuthChange }) {
     // 서버에도 저장
     try {
       const API_URL = import.meta.env?.VITE_API_URL || ''
-      const res = await fetch(`${API_URL}/api/settings`, {
+      const res = await fetch(`${API_URL}/api/settings?dept=${encodeURIComponent(selectedDept)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -175,7 +180,7 @@ export default function AdminPage({ onAuthChange }) {
       if (result.success) {
         setSaved(true)
         setTimeout(() => setSaved(false), 2000)
-        checkServerStatus()
+        checkServerStatus(selectedDept)
       } else {
         alert('서버 저장 실패: ' + result.message)
       }
@@ -236,6 +241,28 @@ export default function AdminPage({ onAuthChange }) {
         관리자 설정
       </h2>
 
+      {/* 부서 선택 */}
+      <div className="admin-card" style={{ marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <h3 style={{ margin: 0 }}>편집 부서 선택</h3>
+          <span style={{ fontSize: '13px', color: '#4a5568', fontWeight: '600' }}>
+            현재 편집 중인 부서: <span style={{ color: '#1a365d' }}>{selectedDept}</span>
+          </span>
+        </div>
+        <select
+          className="form-select"
+          value={selectedDept}
+          onChange={e => {
+            setSelectedDept(e.target.value)
+            setSaved(false)
+          }}
+        >
+          {DEPARTMENTS.map(dept => (
+            <option key={dept.id} value={dept.id}>{dept.id}</option>
+          ))}
+        </select>
+      </div>
+
       {/* 서버 설정 상태 */}
       <div style={{
         padding: '12px', borderRadius: '8px', marginBottom: '12px', fontSize: '13px',
@@ -280,13 +307,29 @@ export default function AdminPage({ onAuthChange }) {
             }))}
           />
         </div>
+        <div className="form-group">
+          <label className="form-label">카카오 오픈채팅 링크</label>
+          <input
+            type="url"
+            className="form-input"
+            placeholder="https://open.kakao.com/o/..."
+            value={settings.kakaoLink || ''}
+            onChange={e => setSettings(prev => ({
+              ...prev,
+              kakaoLink: e.target.value
+            }))}
+          />
+          <p style={{ fontSize: '11px', color: '#718096', marginTop: '4px' }}>
+            보고서 작성 화면 상단의 "상황알림" 버튼에 사용됩니다.
+          </p>
+        </div>
         {serverStatus === 'ok' && settings.senderEmail && (
           <button
             className="btn-add"
             onClick={async () => {
               try {
                 const API_URL = import.meta.env?.VITE_API_URL || ''
-                const res = await fetch(`${API_URL}/api/test-email`, {
+                const res = await fetch(`${API_URL}/api/test-email?dept=${encodeURIComponent(selectedDept)}`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',

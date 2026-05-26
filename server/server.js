@@ -69,21 +69,37 @@ async function connectDB() {
   }
 }
 
-async function loadSettings() {
+async function loadSettings(key) {
+  const docKey = key || 'admin_settings'
   if (!db) return null
   try {
-    return await db.collection('settings').findOne({ _id: 'admin_settings' })
+    let doc = await db.collection('settings').findOne({ _id: docKey })
+    // 마이그레이션: dept_매립운영처 없으면 admin_settings에서 복사
+    if (!doc && docKey === 'dept_매립운영처') {
+      const old = await db.collection('settings').findOne({ _id: 'admin_settings' })
+      if (old) {
+        const { _id, ...data } = old
+        await db.collection('settings').updateOne(
+          { _id: docKey },
+          { $set: { ...data, _id: docKey, migratedAt: new Date() } },
+          { upsert: true }
+        )
+        return old
+      }
+    }
+    return doc
   } catch (e) {
     console.error('설정 읽기 실패:', e)
     return null
   }
 }
 
-async function saveSettingsToDB(settings) {
-  if (!db) throw new Error('데이터베이스가 연결되지 않았습니다.')
+async function saveSettingsToDB(key, settings) {
+  const docKey = key || 'admin_settings'
+  if (!db) throw new Error('DB 연결 없음')
   await db.collection('settings').updateOne(
-    { _id: 'admin_settings' },
-    { $set: { ...settings, _id: 'admin_settings', updatedAt: new Date() } },
+    { _id: docKey },
+    { $set: { ...settings, _id: docKey, updatedAt: new Date() } },
     { upsert: true }
   )
 }
@@ -136,7 +152,7 @@ async function sendEmail({ senderEmail, senderName, to, subject, html, attachmen
 // 관리자 로그인 (ID/PW 받아서 토큰 발급)
 app.post('/api/admin/login', async (req, res) => {
   const { id, password } = req.body
-  const settings = await loadSettings()
+  const settings = await loadSettings('admin_settings')  // 명시적으로 글로벌
   const adminId = settings?.adminId || 'merib'
   const adminPw = settings?.adminPw || 'slc1000'
   const adminToken = process.env.ADMIN_TOKEN
@@ -157,7 +173,9 @@ app.post('/api/admin/login', async (req, res) => {
 // 설정 저장 (관리자 전용)
 app.post('/api/settings', requireAdminAuth, async (req, res) => {
   try {
-    await saveSettingsToDB(req.body)
+    const deptId = req.query.dept
+    const key = deptId ? `dept_${deptId}` : 'admin_settings'
+    await saveSettingsToDB(key, req.body)
     res.json({ success: true, message: '설정이 저장되었습니다.' })
   } catch (error) {
     res.status(500).json({ success: false, message: '설정 저장 실패: ' + error.message })
@@ -166,7 +184,9 @@ app.post('/api/settings', requireAdminAuth, async (req, res) => {
 
 // 설정 조회 (관리자 전용 - 수신자 이메일 등 민감 정보 포함)
 app.get('/api/settings', requireAdminAuth, async (req, res) => {
-  const settings = await loadSettings()
+  const deptId = req.query.dept
+  const key = deptId ? `dept_${deptId}` : 'admin_settings'
+  const settings = await loadSettings(key)
   const hasBrevoKey = !!process.env.BREVO_API_KEY
 
   if (settings?.senderEmail && hasBrevoKey) {
@@ -182,8 +202,13 @@ app.get('/api/settings', requireAdminAuth, async (req, res) => {
 
 // 사업/소속 구성만 조회 (누구나 접근 가능, 로그인 불필요)
 app.get('/api/projects', async (req, res) => {
-  const settings = await loadSettings()
-  res.json({ projects: settings?.projects || null })
+  const deptId = req.query.dept
+  const key = deptId ? `dept_${deptId}` : 'admin_settings'
+  const settings = await loadSettings(key)
+  res.json({
+    projects: settings?.projects || null,
+    kakaoLink: settings?.kakaoLink || ''
+  })
 })
 
 // ===== 보고서 제출 + 이메일 발송 =====
@@ -191,8 +216,10 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
   try {
     const { reportSummary } = JSON.parse(req.body.data)
     const pdfBuffer = req.file?.buffer
+    const deptId = reportSummary.deptId
+    const key = deptId ? `dept_${deptId}` : 'admin_settings'
 
-    const settings = await loadSettings()
+    const settings = await loadSettings(key)
     if (!settings?.senderEmail) {
       return res.status(400).json({
         success: false,
@@ -214,9 +241,9 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
 
     await sendEmail({
       senderEmail: settings.senderEmail,
-      senderName: '매립운영처 사고보고시스템',
+      senderName: `${deptId || '매립운영처'} 사고보고시스템`,
       to: emailList,
-      subject: `[사고발생보고] ${reportSummary.projectName} - ${reportSummary.name} (${reportSummary.date})`,
+      subject: `[사고발생보고] ${deptId || ''} ${reportSummary.projectName} - ${reportSummary.name} (${reportSummary.date})`,
       html: `
         <div style="font-family: 'Malgun Gothic', sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: #1a365d; color: white; padding: 20px; text-align: center;">
@@ -236,7 +263,7 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
             </p>
           </div>
           <div style="padding: 12px; text-align: center; color: #a0aec0; font-size: 12px;">
-            수도권매립지관리공사 매립운영처 사고보고시스템
+            수도권매립지관리공사 ${deptId || '매립운영처'} 사고보고시스템
           </div>
         </div>
       `,
@@ -263,7 +290,9 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
 // 이메일 테스트
 app.post('/api/test-email', requireAdminAuth, async (req, res) => {
   try {
-    const settings = await loadSettings()
+    const deptId = req.query.dept
+    const key = deptId ? `dept_${deptId}` : 'admin_settings'
+    const settings = await loadSettings(key)
     const testTo = req.body.testTo || settings?.senderEmail
     if (!testTo) {
       return res.status(400).json({ success: false, message: '테스트 수신 이메일을 입력하세요.' })

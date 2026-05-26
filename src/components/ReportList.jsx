@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { getReports, deleteReport, clearAllReports } from '../utils/storage'
 import { generatePDF } from '../utils/pdfGenerator'
 
-export default function ReportList() {
+export default function ReportList({ deptId }) {
   const [reports, setReports] = useState([])
   const [resending, setResending] = useState(null)
 
@@ -15,7 +15,7 @@ export default function ReportList() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `사고발생보고서_${report.name}_${report.date}.pdf`
+    a.download = `사고보고서(${report.date}).pdf`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -25,7 +25,7 @@ export default function ReportList() {
     try {
       const pdfBlob = await generatePDF(report)
       const formData = new FormData()
-      formData.append('pdf', pdfBlob, `사고발생보고서_${report.name}_${report.date}.pdf`)
+      formData.append('pdf', pdfBlob, `사고보고서(${report.date}).pdf`)
       formData.append('data', JSON.stringify({
         reportSummary: {
           isVehicleAccident: report.isVehicleAccident,
@@ -38,6 +38,7 @@ export default function ReportList() {
           location: report.location,
           date: report.date,
           time: report.time,
+          deptId: deptId || report.deptId || '',
         }
       }))
 
