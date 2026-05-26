@@ -8,52 +8,19 @@ export default function DepartmentSelect({ adminLoggedIn, onShowLogin, onLogout 
     <div style={{ minHeight: '100vh', background: '#f8f5f0', display: 'flex', flexDirection: 'column' }}>
 
       {/* ── 헤더 배너 ── */}
-      <header style={{ background: '#EDE8DC', position: 'relative' }}>
-        {/* 관리자 버튼 (우상단 절대 배치) */}
-        <div style={{ position: 'absolute', top: '10px', right: '14px', zIndex: 10 }}>
-          {adminLoggedIn ? (
-            <button
-              onClick={onLogout}
-              style={{
-                padding: '5px 12px', background: 'rgba(0,0,0,0.12)',
-                border: '1px solid rgba(0,0,0,0.2)', borderRadius: '6px',
-                color: '#333', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit'
-              }}
-            >
-              로그아웃
-            </button>
-          ) : (
-            <button
-              onClick={onShowLogin}
-              style={{
-                padding: '5px 12px', background: 'rgba(0,0,0,0.08)',
-                border: '1px solid rgba(0,0,0,0.15)', borderRadius: '6px',
-                color: '#555', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit'
-              }}
-            >
-              관리자
-            </button>
-          )}
-        </div>
-
-        {/* 배너 이미지 전체 너비 */}
-        <div style={{ position: 'relative' }}>
-          <img
-            src="/main-banner.png"
-            alt="수도권매립지관리공사"
-            style={{ width: '100%', display: 'block' }}
-          />
-          {/* 이미지 우측 여백 위에 텍스트 오버레이 */}
-          <div style={{
-            position: 'absolute',
-            right: '20px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            textAlign: 'right',
-          }}>
+      <header>
+        {/* 상단 띠: 텍스트 + 관리자 버튼 */}
+        <div style={{
+          background: '#EDE8DC',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '14px 18px 10px',
+        }}>
+          <div>
             <div style={{
               color: '#1a90c8',
-              fontSize: '22px',
+              fontSize: '20px',
               fontWeight: '800',
               letterSpacing: '-0.5px',
               lineHeight: 1.2,
@@ -62,15 +29,59 @@ export default function DepartmentSelect({ adminLoggedIn, onShowLogin, onLogout 
             </div>
             <div style={{
               color: '#444',
-              fontSize: '15px',
+              fontSize: '14px',
               fontWeight: '600',
-              marginTop: '4px',
+              marginTop: '3px',
               letterSpacing: '-0.2px',
             }}>
               사고 보고 시스템
             </div>
           </div>
+
+          {/* 관리자 / 로그아웃 버튼 */}
+          {adminLoggedIn ? (
+            <button
+              onClick={onLogout}
+              style={{
+                padding: '6px 14px',
+                background: 'rgba(0,0,0,0.10)',
+                border: '1px solid rgba(0,0,0,0.18)',
+                borderRadius: '6px',
+                color: '#333',
+                fontSize: '12px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                flexShrink: 0,
+              }}
+            >
+              로그아웃
+            </button>
+          ) : (
+            <button
+              onClick={onShowLogin}
+              style={{
+                padding: '6px 14px',
+                background: 'rgba(0,0,0,0.07)',
+                border: '1px solid rgba(0,0,0,0.13)',
+                borderRadius: '6px',
+                color: '#555',
+                fontSize: '12px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                flexShrink: 0,
+              }}
+            >
+              관리자
+            </button>
+          )}
         </div>
+
+        {/* 하단: 캐릭터 배너 이미지 */}
+        <img
+          src="/main-banner.png"
+          alt="캐릭터"
+          style={{ width: '100%', display: 'block' }}
+        />
       </header>
 
       {/* ── 부서 선택 본문 ── */}
