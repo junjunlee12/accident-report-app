@@ -36,21 +36,21 @@ export default function DepartmentSelect({ adminLoggedIn, onShowLogin, onLogout 
           )}
         </div>
 
-        {/* 배너 본체: 캐릭터 좌측 + 텍스트 우측 */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'space-between',
-          maxWidth: '520px',
-          margin: '0 auto',
-          padding: '0 20px',
-        }}>
+        {/* 배너 이미지 전체 너비 */}
+        <div style={{ position: 'relative' }}>
           <img
-            src="/character.png"
-            alt="캐릭터"
-            style={{ height: '110px', objectFit: 'contain', display: 'block' }}
+            src="/main-banner.png"
+            alt="수도권매립지관리공사"
+            style={{ width: '100%', display: 'block' }}
           />
-          <div style={{ textAlign: 'right', paddingBottom: '16px' }}>
+          {/* 이미지 우측 여백 위에 텍스트 오버레이 */}
+          <div style={{
+            position: 'absolute',
+            right: '20px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            textAlign: 'right',
+          }}>
             <div style={{
               color: '#1a90c8',
               fontSize: '22px',
@@ -61,7 +61,7 @@ export default function DepartmentSelect({ adminLoggedIn, onShowLogin, onLogout 
               수도권매립지관리공사
             </div>
             <div style={{
-              color: '#333',
+              color: '#444',
               fontSize: '15px',
               fontWeight: '600',
               marginTop: '4px',
