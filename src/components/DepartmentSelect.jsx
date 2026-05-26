@@ -7,22 +7,23 @@ export default function DepartmentSelect({ adminLoggedIn, onShowLogin, onLogout 
   return (
     <div style={{ minHeight: '100vh', background: '#f8f5f0', display: 'flex', flexDirection: 'column' }}>
 
-      {/* ── 헤더 배너 ── */}
-      <header>
-        {/* 최상단 바: 관리자/로그아웃 버튼만 (배너와 동일 배경색) */}
-        <div style={{
-          background: '#EEE9D5',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          padding: '7px 14px',
-        }}>
+      {/* ── 헤더 배너: 이미지 하나에 버튼·텍스트 모두 오버레이 ── */}
+      <header style={{ position: 'relative' }}>
+        <img
+          src="/main-banner-2.png"
+          alt="수도권매립지관리공사"
+          style={{ width: '100%', display: 'block' }}
+        />
+
+        {/* 관리자/로그아웃 버튼 - 이미지 상단 우측 */}
+        <div style={{ position: 'absolute', top: '10px', right: '14px' }}>
           {adminLoggedIn ? (
             <button
               onClick={onLogout}
               style={{
                 padding: '4px 12px',
                 background: 'rgba(0,0,0,0.10)',
-                border: '1px solid rgba(0,0,0,0.18)',
+                border: '1px solid rgba(0,0,0,0.20)',
                 borderRadius: '5px',
                 color: '#333',
                 fontSize: '12px',
@@ -38,7 +39,7 @@ export default function DepartmentSelect({ adminLoggedIn, onShowLogin, onLogout 
               style={{
                 padding: '4px 12px',
                 background: 'rgba(0,0,0,0.07)',
-                border: '1px solid rgba(0,0,0,0.13)',
+                border: '1px solid rgba(0,0,0,0.15)',
                 borderRadius: '5px',
                 color: '#555',
                 fontSize: '12px',
@@ -51,39 +52,30 @@ export default function DepartmentSelect({ adminLoggedIn, onShowLogin, onLogout 
           )}
         </div>
 
-        {/* 배너 이미지 + 텍스트 오버레이 (마스코트와 같은 높이) */}
-        <div style={{ position: 'relative' }}>
-          <img
-            src="/main-banner-2.png"
-            alt="수도권매립지관리공사"
-            style={{ width: '100%', display: 'block' }}
-          />
-          {/* 우측 빈 공간에 텍스트 - 마스코트 높이 기준 세로 배치 */}
+        {/* 텍스트 - 마스코트 높이 우측 (이미지 하단 중심) */}
+        <div style={{
+          position: 'absolute',
+          right: '20px',
+          bottom: '18%',
+          textAlign: 'right',
+        }}>
           <div style={{
-            position: 'absolute',
-            right: '20px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            textAlign: 'right',
+            color: '#1a90c8',
+            fontSize: '20px',
+            fontWeight: '800',
+            letterSpacing: '-0.5px',
+            lineHeight: 1.2,
           }}>
-            <div style={{
-              color: '#1a90c8',
-              fontSize: '20px',
-              fontWeight: '800',
-              letterSpacing: '-0.5px',
-              lineHeight: 1.2,
-            }}>
-              수도권매립지관리공사
-            </div>
-            <div style={{
-              color: '#555',
-              fontSize: '14px',
-              fontWeight: '600',
-              marginTop: '5px',
-              letterSpacing: '-0.2px',
-            }}>
-              사고 보고 시스템
-            </div>
+            수도권매립지관리공사
+          </div>
+          <div style={{
+            color: '#555',
+            fontSize: '14px',
+            fontWeight: '600',
+            marginTop: '5px',
+            letterSpacing: '-0.2px',
+          }}>
+            사고 보고 시스템
           </div>
         </div>
       </header>
