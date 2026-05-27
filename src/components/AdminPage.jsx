@@ -323,6 +323,28 @@ export default function AdminPage({ onAuthChange }) {
             보고서 작성 화면 상단의 "상황알림" 버튼에 사용됩니다.
           </p>
         </div>
+
+        {/* 모의훈련 탭 표시 여부 */}
+        <div className="form-group">
+          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={settings.showDrillMode || false}
+              onChange={e => setSettings(prev => ({ ...prev, showDrillMode: e.target.checked }))}
+              style={{ width: '20px', height: '20px', accentColor: '#276749' }}
+            />
+            <div>
+              <span style={{ fontSize: '14px', fontWeight: '600', color: '#276749' }}>
+                모의훈련 탭 표시
+              </span>
+              <p style={{ fontSize: '11px', color: '#718096', margin: '2px 0 0' }}>
+                활성화하면 보고서 작성 화면에 "모의훈련" 체크박스가 표시됩니다.<br />
+                모의훈련 체크 시 보고서 제목과 이메일 제목 앞에 [모의훈련]이 붙습니다.
+              </p>
+            </div>
+          </label>
+        </div>
+
         {serverStatus === 'ok' && settings.senderEmail && (
           <button
             className="btn-add"

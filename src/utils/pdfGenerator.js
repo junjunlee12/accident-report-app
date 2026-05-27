@@ -91,8 +91,9 @@ async function generateAccidentPDF(report) {
   }
 
   // 제목
-  drawFilledRect(15, y, 180, 10, '#1a365d')
-  drawText('재난(산업재해) 발생보고서', 105, y + 7.5, {
+  const accidentTitle = (report.isMockDrill ? '[모의훈련] ' : '') + '재난(산업재해) 발생보고서'
+  drawFilledRect(15, y, 180, 10, report.isMockDrill ? '#276749' : '#1a365d')
+  drawText(accidentTitle, 105, y + 7.5, {
     fontSize: 16, fontWeight: 'bold', color: '#ffffff', align: 'center'
   })
   y += 16
@@ -317,7 +318,8 @@ async function generateVehiclePDF(report) {
   }
 
   // 제목
-  drawText('차 량 사 고 보 고 서', 105, y, { fontSize: 18, fontWeight: 'bold', align: 'center' })
+  const vehicleTitle = (report.isMockDrill ? '[모의훈련] ' : '') + '차 량 사 고 보 고 서'
+  drawText(vehicleTitle, 105, y, { fontSize: 18, fontWeight: 'bold', align: 'center' })
   ctx.beginPath()
   ctx.strokeStyle = '#000'
   ctx.lineWidth = mm(0.5)

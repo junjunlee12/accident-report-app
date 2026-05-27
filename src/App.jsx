@@ -11,6 +11,7 @@ import './App.css'
 
 const INITIAL_FORM = {
   isVehicleAccident: false, vehicleNumber: '',
+  isMockDrill: false,
   projectName: '', company: '', subContractor: '', location: '',
   date: '', time: '',
   personNone: false,

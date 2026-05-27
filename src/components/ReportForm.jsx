@@ -8,6 +8,7 @@ export default function ReportForm({ formData, setFormData, initialForm, deptId 
   const [showModal, setShowModal] = useState(false)
   const [submittedReport, setSubmittedReport] = useState(null)
   const [projects, setProjects] = useState(DEFAULT_PROJECTS)
+  const [showDrillMode, setShowDrillMode] = useState(false)
 
   // 서버에서 최신 사업/소속 설정 가져오기 (실패 시 기본값 사용)
   useEffect(() => {
@@ -18,6 +19,9 @@ export default function ReportForm({ formData, setFormData, initialForm, deptId 
       .then(data => {
         if (data.projects && Array.isArray(data.projects) && data.projects.length > 0) {
           setProjects(data.projects)
+        }
+        if (data.showDrillMode !== undefined) {
+          setShowDrillMode(!!data.showDrillMode)
         }
       })
       .catch(() => {
@@ -173,6 +177,7 @@ export default function ReportForm({ formData, setFormData, initialForm, deptId 
       formData.append('data', JSON.stringify({
         reportSummary: {
           isVehicleAccident: report.isVehicleAccident,
+          isMockDrill: report.isMockDrill || false,
           projectName: report.projectName,
           company: report.displayCompany,
           subContractor: report.subContractor,
@@ -244,19 +249,36 @@ export default function ReportForm({ formData, setFormData, initialForm, deptId 
 
   return (
     <div>
-      {/* 업무용 차량 사고 체크박스 */}
-      <div className="form-section" style={{ background: form.isVehicleAccident ? '#fffff0' : '#fff' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={form.isVehicleAccident}
-            onChange={e => update('isVehicleAccident', e.target.checked)}
-            style={{ width: '22px', height: '22px', accentColor: '#d69e2e' }}
-          />
-          <span style={{ fontSize: '15px', fontWeight: '700', color: '#975a16' }}>
-            업무용 차량 사고
-          </span>
-        </label>
+      {/* 업무용 차량 사고 / 모의훈련 체크박스 */}
+      <div className="form-section" style={{
+        background: form.isMockDrill ? '#f0fff4' : form.isVehicleAccident ? '#fffff0' : '#fff'
+      }}>
+        <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={form.isVehicleAccident}
+              onChange={e => update('isVehicleAccident', e.target.checked)}
+              style={{ width: '22px', height: '22px', accentColor: '#d69e2e' }}
+            />
+            <span style={{ fontSize: '15px', fontWeight: '700', color: '#975a16' }}>
+              업무용 차량 사고
+            </span>
+          </label>
+          {showDrillMode && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={form.isMockDrill}
+                onChange={e => update('isMockDrill', e.target.checked)}
+                style={{ width: '22px', height: '22px', accentColor: '#276749' }}
+              />
+              <span style={{ fontSize: '15px', fontWeight: '700', color: '#276749' }}>
+                모의훈련
+              </span>
+            </label>
+          )}
+        </div>
         {form.isVehicleAccident && (
           <div className="form-group" style={{ marginTop: '12px' }}>
             <label className="form-label">차량번호 <span className="required">*</span></label>

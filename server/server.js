@@ -207,7 +207,8 @@ app.get('/api/projects', async (req, res) => {
   const settings = await loadSettings(key)
   res.json({
     projects: settings?.projects || null,
-    kakaoLink: settings?.kakaoLink || ''
+    kakaoLink: settings?.kakaoLink || '',
+    showDrillMode: settings?.showDrillMode || false
   })
 })
 
@@ -239,15 +240,16 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
       })
     }
 
+    const drillPrefix = reportSummary.isMockDrill ? '[모의훈련] ' : ''
     await sendEmail({
       senderEmail: settings.senderEmail,
       senderName: `${deptId || '매립운영처'} 사고보고시스템`,
       to: emailList,
-      subject: `[사고발생보고] ${deptId || ''} ${reportSummary.projectName} - ${reportSummary.name} (${reportSummary.date})`,
+      subject: `${drillPrefix}[사고발생보고] ${deptId || ''} ${reportSummary.projectName} - ${reportSummary.name} (${reportSummary.date})`,
       html: `
         <div style="font-family: 'Malgun Gothic', sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: #1a365d; color: white; padding: 20px; text-align: center;">
-            <h2 style="margin: 0;">사고 발생보고서</h2>
+          <div style="background: ${reportSummary.isMockDrill ? '#276749' : '#1a365d'}; color: white; padding: 20px; text-align: center;">
+            <h2 style="margin: 0;">${drillPrefix}사고 발생보고서</h2>
           </div>
           <div style="padding: 20px; border: 1px solid #e2e8f0;">
             <table style="width: 100%; border-collapse: collapse;">
