@@ -112,6 +112,11 @@ export default function ReportList({ deptId }) {
             <div><strong>일시:</strong> {report.date} {report.time}</div>
             <div><strong>장소:</strong> {report.location}</div>
           </div>
+          {report.photoCount > 0 && (
+            <div style={{ fontSize: '11px', color: '#a0aec0', marginBottom: '6px' }}>
+              * 재발송 시 사진({report.photoCount}장) 미포함
+            </div>
+          )}
           <div className="report-card-actions">
             <button className="btn-pdf" onClick={() => handleDownload(report)}>
               PDF
@@ -121,8 +126,9 @@ export default function ReportList({ deptId }) {
               onClick={() => handleResend(report)}
               disabled={resending === report.id}
               style={{ color: '#2b6cb0', borderColor: '#bee3f8' }}
+              title="사진은 포함되지 않습니다"
             >
-              {resending === report.id ? '발송중...' : '재발송'}
+              {resending === report.id ? '발송중...' : '재발송*'}
             </button>
             <button
               className="btn-pdf"
