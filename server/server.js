@@ -104,15 +104,6 @@ async function saveSettingsToDB(key, settings) {
   )
 }
 
-// RFC 2047 Base64 인코딩 - 파일명 기본이름만 인코딩, 확장자는 밖에 둬서 Brevo가 포맷 인식 가능하게
-function encodeEmailFilename(filename) {
-  const lastDot = filename.lastIndexOf('.')
-  const baseName = lastDot >= 0 ? filename.substring(0, lastDot) : filename
-  const ext = lastDot >= 0 ? filename.substring(lastDot) : '' // e.g. ".pdf"
-  const base64 = Buffer.from(baseName, 'utf8').toString('base64')
-  return `=?UTF-8?B?${base64}?=${ext}`
-}
-
 // ===== Brevo API로 이메일 발송 =====
 async function sendEmail({ senderEmail, senderName, to, subject, html, attachments }) {
   const apiKey = process.env.BREVO_API_KEY
@@ -273,7 +264,7 @@ app.post('/api/submit-report', upload.single('pdf'), async (req, res) => {
         </div>
       `,
       attachments: pdfBuffer ? [{
-        filename: encodeEmailFilename(`사고보고서(${reportSummary.date}).pdf`),
+        filename: `report-${reportSummary.date}.pdf`,
         content: pdfBuffer
       }] : []
     })
