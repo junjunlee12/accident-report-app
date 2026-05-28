@@ -8,7 +8,12 @@ export default function ReportForm({ formData, setFormData, initialForm, deptId 
   const [showModal, setShowModal] = useState(false)
   const [submittedReport, setSubmittedReport] = useState(null)
   const [projects, setProjects] = useState(DEFAULT_PROJECTS)
-  const [showDrillMode, setShowDrillMode] = useState(false)
+
+  // localStorage 캐시에서 즉시 읽기 (서버 슬립 중에도 모의훈련 탭 바로 표시)
+  const deptCacheKey = `deptConfig_${deptId || ''}`
+  const [showDrillMode, setShowDrillMode] = useState(() => {
+    try { return !!JSON.parse(localStorage.getItem(deptCacheKey))?.showDrillMode } catch { return false }
+  })
 
   // 서버에서 최신 사업/소속 설정 가져오기 (실패 시 기본값 사용)
   useEffect(() => {
@@ -23,6 +28,14 @@ export default function ReportForm({ formData, setFormData, initialForm, deptId 
         if (data.showDrillMode !== undefined) {
           setShowDrillMode(!!data.showDrillMode)
         }
+        // 캐시 갱신
+        try {
+          const prev = JSON.parse(localStorage.getItem(deptCacheKey)) || {}
+          localStorage.setItem(deptCacheKey, JSON.stringify({
+            ...prev,
+            showDrillMode: !!data.showDrillMode,
+          }))
+        } catch {}
       })
       .catch(() => {
         // 서버 연결 실패 시 기본값 유지

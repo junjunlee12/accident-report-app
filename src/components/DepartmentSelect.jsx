@@ -1,8 +1,15 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DEPT_GROUPS, getDeptById } from '../config/departments'
 
 export default function DepartmentSelect({ adminLoggedIn, onShowLogin, onLogout }) {
   const navigate = useNavigate()
+
+  // 부서 선택 화면에 머무는 동안 백엔드 미리 깨우기 (Render 슬립 해제)
+  useEffect(() => {
+    const API_URL = import.meta.env?.VITE_API_URL || ''
+    fetch(`${API_URL}/api/health`).catch(() => {})
+  }, [])
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8f5f0', display: 'flex', flexDirection: 'column' }}>

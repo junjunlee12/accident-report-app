@@ -31,18 +31,32 @@ function DeptPage({ adminLoggedIn, onShowLogin, onLogout }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [formData, setFormData] = useState(INITIAL_FORM)
-  const [kakaoLink, setKakaoLink] = useState('')
 
   const decodedDeptId = decodeURIComponent(deptId)
   const dept = getDeptById(decodedDeptId)
   const deptColor = dept?.color || '#1a365d'
+
+  // localStorage에서 즉시 읽어서 서버 슬립 중에도 버튼 바로 표시
+  const cacheKey = `deptConfig_${decodedDeptId}`
+  const [kakaoLink, setKakaoLink] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(cacheKey))?.kakaoLink || '' } catch { return '' }
+  })
 
   useEffect(() => {
     const API_URL = import.meta.env?.VITE_API_URL || ''
     fetch(`${API_URL}/api/projects?dept=${encodeURIComponent(decodedDeptId)}`)
       .then(res => res.json())
       .then(data => {
-        if (data.kakaoLink) setKakaoLink(data.kakaoLink)
+        // 캐시 갱신 (다음 방문 시 즉시 표시용)
+        try {
+          const prev = JSON.parse(localStorage.getItem(cacheKey)) || {}
+          localStorage.setItem(cacheKey, JSON.stringify({
+            ...prev,
+            kakaoLink: data.kakaoLink || '',
+            showDrillMode: data.showDrillMode || false,
+          }))
+        } catch {}
+        setKakaoLink(data.kakaoLink || '')
       })
       .catch(() => {})
   }, [decodedDeptId])
