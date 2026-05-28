@@ -104,6 +104,58 @@ async function saveSettingsToDB(key, settings) {
   )
 }
 
+// GitHub API로 public/kakao-config.json 업데이트 (프론트엔드 정적 파일 → 백엔드 없이 항상 접근 가능)
+async function updateGithubKakaoConfig(deptId, kakaoLink) {
+  const token = process.env.GITHUB_TOKEN
+  if (!token) return // 토큰 미설정 시 스킵 (기존 방식으로 fallback)
+
+  const owner = 'junjunlee12'
+  const repo = 'accident-report-app'
+  const filePath = 'public/kakao-config.json'
+
+  try {
+    // 현재 파일 내용 + SHA 가져오기
+    const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`, {
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+    })
+
+    let currentData = {}
+    let sha = null
+    if (getRes.ok) {
+      const fileData = await getRes.json()
+      sha = fileData.sha
+      currentData = JSON.parse(Buffer.from(fileData.content, 'base64').toString('utf8'))
+    }
+
+    // kakaoLink 업데이트 (없으면 해당 부서 항목 제거)
+    if (kakaoLink) {
+      currentData[deptId] = { kakaoLink }
+    } else {
+      delete currentData[deptId]
+    }
+
+    const content = Buffer.from(JSON.stringify(currentData, null, 2)).toString('base64')
+    const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`, {
+      method: 'PUT',
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: `chore: update kakao config for ${deptId}`,
+        content,
+        ...(sha && { sha })
+      })
+    })
+
+    if (!putRes.ok) {
+      const err = await putRes.json()
+      console.error('GitHub kakao-config 업데이트 실패:', err.message)
+    } else {
+      console.log(`GitHub kakao-config 업데이트 완료: ${deptId} → ${kakaoLink || '(제거)'}`)
+    }
+  } catch (e) {
+    console.error('GitHub kakao-config 업데이트 오류:', e.message)
+  }
+}
+
 // ===== Brevo API로 이메일 발송 =====
 async function sendEmail({ senderEmail, senderName, to, subject, html, attachments }) {
   const apiKey = process.env.BREVO_API_KEY
@@ -170,6 +222,12 @@ app.post('/api/settings', requireAdminAuth, async (req, res) => {
     const deptId = req.query.dept
     const key = deptId ? `dept_${deptId}` : 'admin_settings'
     await saveSettingsToDB(key, req.body)
+
+    // kakaoLink가 포함된 경우 GitHub 정적 파일도 업데이트 (프론트엔드 즉시 반영용)
+    if (deptId && req.body.kakaoLink !== undefined) {
+      updateGithubKakaoConfig(deptId, req.body.kakaoLink).catch(() => {})
+    }
+
     res.json({ success: true, message: '설정이 저장되었습니다.' })
   } catch (error) {
     res.status(500).json({ success: false, message: '설정 저장 실패: ' + error.message })

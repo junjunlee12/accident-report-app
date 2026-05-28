@@ -36,18 +36,27 @@ function DeptPage({ adminLoggedIn, onShowLogin, onLogout }) {
   const dept = getDeptById(decodedDeptId)
   const deptColor = dept?.color || '#1a365d'
 
-  // localStorage에서 즉시 읽어서 서버 슬립 중에도 버튼 바로 표시
+  // localStorage 캐시에서 즉시 읽기
   const cacheKey = `deptConfig_${decodedDeptId}`
   const [kakaoLink, setKakaoLink] = useState(() => {
     try { return JSON.parse(localStorage.getItem(cacheKey))?.kakaoLink || '' } catch { return '' }
   })
 
   useEffect(() => {
+    // 1순위: 정적 파일 읽기 (프론트엔드 서버에서 제공, 백엔드 슬립과 무관하게 항상 즉시 응답)
+    fetch('/kakao-config.json')
+      .then(res => res.json())
+      .then(config => {
+        const staticLink = config[decodedDeptId]?.kakaoLink || ''
+        if (staticLink) setKakaoLink(staticLink)
+      })
+      .catch(() => {})
+
+    // 2순위: 백엔드에서 최신값 조회 (서버가 깨있으면 덮어씀, 슬립 중이면 스킵)
     const API_URL = import.meta.env?.VITE_API_URL || ''
     fetch(`${API_URL}/api/projects?dept=${encodeURIComponent(decodedDeptId)}`)
       .then(res => res.json())
       .then(data => {
-        // 캐시 갱신 (다음 방문 시 즉시 표시용)
         try {
           const prev = JSON.parse(localStorage.getItem(cacheKey)) || {}
           localStorage.setItem(cacheKey, JSON.stringify({
@@ -56,7 +65,7 @@ function DeptPage({ adminLoggedIn, onShowLogin, onLogout }) {
             showDrillMode: data.showDrillMode || false,
           }))
         } catch {}
-        setKakaoLink(data.kakaoLink || '')
+        if (data.kakaoLink !== undefined) setKakaoLink(data.kakaoLink || '')
       })
       .catch(() => {})
   }, [decodedDeptId])
