@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react'
 import { getAdminSettings, saveAdminSettings } from '../utils/storage'
-import { logoutAdmin, changeAdminCredentials, transferAdmin, getAdminToken } from '../utils/auth'
+import { logoutAdmin, getAdminToken, isSuperAdmin, getAdminDept, changeAdminCredentials, transferAdmin } from '../utils/auth'
 import { DEFAULT_PROJECTS, getAllRecipientKeys, SPECIAL_RECIPIENT_KEYS } from '../config/projects'
 import { DEPARTMENTS } from '../config/departments'
 
 export default function AdminPage({ onAuthChange }) {
-  const [selectedDept, setSelectedDept] = useState('매립운영처')
+  const isSuper = isSuperAdmin()
+  const myDept = getAdminDept() // 부서 관리자이면 자신의 부서, 슈퍼면 null
+  const [selectedDept, setSelectedDept] = useState(myDept || '매립운영처')
+  const [deptAdmins, setDeptAdmins] = useState([])  // 슈퍼관리자용 신청 목록
+  const [showAdminList, setShowAdminList] = useState(false)
   const [settings, setSettings] = useState(() => {
     const stored = getAdminSettings()
     if (!stored.projects) stored.projects = DEFAULT_PROJECTS
@@ -63,6 +67,58 @@ export default function AdminPage({ onAuthChange }) {
     checkServerStatus(selectedDept)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDept])
+
+  // 슈퍼관리자: 부서 관리자 신청 목록 로드
+  const loadDeptAdmins = async () => {
+    if (!isSuper) return
+    try {
+      const API_URL = import.meta.env?.VITE_API_URL || ''
+      const res = await fetch(`${API_URL}/api/dept-admin/list`, {
+        headers: { 'X-Admin-Token': getAdminToken() }
+      })
+      const data = await res.json()
+      if (data.success) setDeptAdmins(data.admins)
+    } catch {}
+  }
+
+  const handleApprove = async (id) => {
+    if (!confirm('승인하시겠습니까?')) return
+    const API_URL = import.meta.env?.VITE_API_URL || ''
+    const res = await fetch(`${API_URL}/api/dept-admin/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': getAdminToken() },
+      body: JSON.stringify({ id })
+    })
+    const data = await res.json()
+    alert(data.message)
+    if (data.success) loadDeptAdmins()
+  }
+
+  const handleReject = async (id) => {
+    if (!confirm('거절하시겠습니까?')) return
+    const API_URL = import.meta.env?.VITE_API_URL || ''
+    const res = await fetch(`${API_URL}/api/dept-admin/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': getAdminToken() },
+      body: JSON.stringify({ id })
+    })
+    const data = await res.json()
+    alert(data.message)
+    if (data.success) loadDeptAdmins()
+  }
+
+  const handleDeleteAdmin = async (id) => {
+    if (!confirm('이 계정을 삭제하시겠습니까?')) return
+    const API_URL = import.meta.env?.VITE_API_URL || ''
+    const res = await fetch(`${API_URL}/api/dept-admin/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': getAdminToken() },
+      body: JSON.stringify({ id })
+    })
+    const data = await res.json()
+    alert(data.message)
+    if (data.success) loadDeptAdmins()
+  }
 
   // 사업 편집 함수들
   const addProject = () => {
@@ -241,27 +297,88 @@ export default function AdminPage({ onAuthChange }) {
         관리자 설정
       </h2>
 
-      {/* 부서 선택 */}
+      {/* 부서 선택 - 슈퍼관리자: 드롭다운 / 부서 관리자: 고정 */}
       <div className="admin-card" style={{ marginBottom: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <h3 style={{ margin: 0 }}>편집 부서 선택</h3>
-          <span style={{ fontSize: '13px', color: '#4a5568', fontWeight: '600' }}>
-            현재 편집 중인 부서: <span style={{ color: '#1a365d' }}>{selectedDept}</span>
-          </span>
+          <h3 style={{ margin: 0 }}>{isSuper ? '편집 부서 선택' : '담당 부서'}</h3>
+          {!isSuper && (
+            <span style={{ fontSize: '11px', background: '#e9d8fd', color: '#553c9a', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
+              부서 관리자
+            </span>
+          )}
         </div>
-        <select
-          className="form-select"
-          value={selectedDept}
-          onChange={e => {
-            setSelectedDept(e.target.value)
-            setSaved(false)
-          }}
-        >
-          {DEPARTMENTS.map(dept => (
-            <option key={dept.id} value={dept.id}>{dept.id}</option>
-          ))}
-        </select>
+        {isSuper ? (
+          <select
+            className="form-select"
+            value={selectedDept}
+            onChange={e => { setSelectedDept(e.target.value); setSaved(false) }}
+          >
+            {DEPARTMENTS.map(dept => (
+              <option key={dept.id} value={dept.id}>{dept.id}</option>
+            ))}
+          </select>
+        ) : (
+          <div style={{ padding: '10px 12px', background: '#f0f4f8', borderRadius: '6px', fontSize: '15px', fontWeight: '700', color: '#1a365d' }}>
+            {selectedDept}
+          </div>
+        )}
       </div>
+
+      {/* 슈퍼관리자 전용: 부서 관리자 신청 목록 */}
+      {isSuper && (
+        <div className="admin-card" style={{ marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h3 style={{ margin: 0 }}>부서 관리자 신청 관리</h3>
+            <button
+              onClick={() => { setShowAdminList(!showAdminList); if (!showAdminList) loadDeptAdmins() }}
+              style={{ padding: '5px 12px', background: '#ebf8ff', border: '1px solid #bee3f8', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit', color: '#2b6cb0' }}
+            >
+              {showAdminList ? '접기' : '목록 보기'}
+            </button>
+          </div>
+          {showAdminList && (
+            <div style={{ marginTop: '12px' }}>
+              {deptAdmins.length === 0 ? (
+                <p style={{ fontSize: '13px', color: '#a0aec0', textAlign: 'center', padding: '12px 0' }}>신청 내역이 없습니다.</p>
+              ) : (
+                deptAdmins.map(admin => (
+                  <div key={admin._id} style={{
+                    padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '8px',
+                    background: admin.status === 'active' ? '#f0fff4' : admin.status === 'pending' ? '#fffaf0' : '#fff5f5'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <span style={{ fontWeight: '700', fontSize: '14px' }}>{admin.deptId}</span>
+                        <span style={{ fontSize: '12px', color: '#718096', marginLeft: '8px' }}>ID: {admin.adminId}</span>
+                        <div style={{ fontSize: '11px', color: '#a0aec0', marginTop: '2px' }}>
+                          신청: {new Date(admin.createdAt).toLocaleDateString('ko-KR')}
+                          {admin.approvedAt && ` · 승인: ${new Date(admin.approvedAt).toLocaleDateString('ko-KR')}`}
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px',
+                        background: admin.status === 'active' ? '#c6f6d5' : admin.status === 'pending' ? '#fefcbf' : '#fed7d7',
+                        color: admin.status === 'active' ? '#276749' : admin.status === 'pending' ? '#975a16' : '#c53030'
+                      }}>
+                        {admin.status === 'active' ? '활성' : admin.status === 'pending' ? '대기' : '거절'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                      {admin.status === 'pending' && (
+                        <>
+                          <button onClick={() => handleApprove(admin._id)} style={{ padding: '4px 12px', background: '#276749', color: '#fff', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>승인</button>
+                          <button onClick={() => handleReject(admin._id)} style={{ padding: '4px 12px', background: '#e53e3e', color: '#fff', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>거절</button>
+                        </>
+                      )}
+                      <button onClick={() => handleDeleteAdmin(admin._id)} style={{ padding: '4px 12px', background: '#fff', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>삭제</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 서버 설정 상태 */}
       <div style={{

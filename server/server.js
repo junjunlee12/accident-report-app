@@ -34,20 +34,43 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }))
 app.use(express.static(path.join(__dirname, 'public')))
 
-// 관리자 인증 미들웨어 - 토큰 검증
-function requireAdminAuth(req, res, next) {
+// 관리자 인증 미들웨어 - 슈퍼관리자 토큰 또는 부서 관리자 토큰 검증
+async function requireAdminAuth(req, res, next) {
   const adminToken = process.env.ADMIN_TOKEN
-  // 환경변수에 토큰 미설정 시 경고 후 통과 (호환성)
+  const clientToken = req.headers['x-admin-token']
+
+  // 환경변수 미설정 시 경고 후 통과 (호환성)
   if (!adminToken) {
     console.warn('⚠️  ADMIN_TOKEN 환경변수 미설정 - 관리자 API가 무방비 상태입니다')
+    req.adminRole = 'super'
     return next()
   }
-  // 클라이언트가 보낸 토큰 확인
-  const clientToken = req.headers['x-admin-token']
+
+  // 슈퍼관리자 토큰 확인
   if (clientToken === adminToken) {
+    req.adminRole = 'super'
     return next()
   }
+
+  // 부서 관리자 토큰 확인 (DB에서 조회)
+  if (clientToken && db) {
+    try {
+      const deptAdmin = await db.collection('dept_admins').findOne({ token: clientToken, status: 'active' })
+      if (deptAdmin) {
+        req.adminRole = 'dept'
+        req.adminDeptId = deptAdmin.deptId
+        return next()
+      }
+    } catch {}
+  }
+
   res.status(401).json({ success: false, message: '관리자 인증이 필요합니다.' })
+}
+
+// 슈퍼관리자 전용 미들웨어
+function requireSuperAdmin(req, res, next) {
+  if (req.adminRole === 'super') return next()
+  res.status(403).json({ success: false, message: '슈퍼관리자 권한이 필요합니다.' })
 }
 
 // ===== MongoDB 연결 =====
@@ -220,6 +243,10 @@ app.post('/api/admin/login', async (req, res) => {
 app.post('/api/settings', requireAdminAuth, async (req, res) => {
   try {
     const deptId = req.query.dept
+    // 부서 관리자는 자신의 부서만 수정 가능
+    if (req.adminRole === 'dept' && deptId !== req.adminDeptId) {
+      return res.status(403).json({ success: false, message: '자신의 부서 설정만 수정할 수 있습니다.' })
+    }
     const key = deptId ? `dept_${deptId}` : 'admin_settings'
     await saveSettingsToDB(key, req.body)
 
@@ -237,6 +264,10 @@ app.post('/api/settings', requireAdminAuth, async (req, res) => {
 // 설정 조회 (관리자 전용 - 수신자 이메일 등 민감 정보 포함)
 app.get('/api/settings', requireAdminAuth, async (req, res) => {
   const deptId = req.query.dept
+  // 부서 관리자는 자신의 부서만 조회 가능
+  if (req.adminRole === 'dept' && deptId !== req.adminDeptId) {
+    return res.status(403).json({ success: false, message: '자신의 부서 설정만 조회할 수 있습니다.' })
+  }
   const key = deptId ? `dept_${deptId}` : 'admin_settings'
   const settings = await loadSettings(key)
   const hasBrevoKey = !!process.env.BREVO_API_KEY
@@ -365,6 +396,121 @@ app.post('/api/test-email', requireAdminAuth, async (req, res) => {
     res.json({ success: true, message: '테스트 이메일이 발송되었습니다.' })
   } catch (error) {
     res.status(500).json({ success: false, message: '발송 실패: ' + error.message })
+  }
+})
+
+// ===== 부서 관리자 API =====
+const crypto = require('crypto')
+const { ObjectId } = require('mongodb')
+
+// 부서 관리자 신청 (누구나 접근 가능)
+app.post('/api/dept-admin/apply', async (req, res) => {
+  const { deptId, adminId, adminPw } = req.body
+  if (!deptId || !adminId || !adminPw) {
+    return res.status(400).json({ success: false, message: '부서, 아이디, 비밀번호를 모두 입력하세요.' })
+  }
+  if (!db) return res.status(500).json({ success: false, message: 'DB 연결 없음' })
+  try {
+    // 이미 활성화된 관리자 존재 확인
+    const active = await db.collection('dept_admins').findOne({ deptId, status: 'active' })
+    if (active) {
+      return res.status(400).json({ success: false, message: '해당 부서에 이미 활성화된 관리자가 있습니다.' })
+    }
+    // 동일 아이디로 대기 중인 신청 확인
+    const pending = await db.collection('dept_admins').findOne({ deptId, adminId, status: 'pending' })
+    if (pending) {
+      return res.status(400).json({ success: false, message: '이미 승인 대기 중인 신청이 있습니다.' })
+    }
+    await db.collection('dept_admins').insertOne({
+      deptId, adminId, adminPw,
+      status: 'pending',
+      token: null,
+      createdAt: new Date()
+    })
+    res.json({ success: true, message: '신청 완료! 슈퍼관리자 승인 후 로그인 가능합니다.' })
+  } catch (e) {
+    res.status(500).json({ success: false, message: '신청 실패: ' + e.message })
+  }
+})
+
+// 부서 관리자 로그인
+app.post('/api/dept-admin/login', async (req, res) => {
+  const { deptId, adminId, adminPw } = req.body
+  if (!db) return res.status(500).json({ success: false, message: 'DB 연결 없음' })
+  try {
+    const admin = await db.collection('dept_admins').findOne({ deptId, adminId, adminPw, status: 'active' })
+    if (!admin) {
+      // 대기 중인지 확인해서 더 친절한 메시지
+      const pending = await db.collection('dept_admins').findOne({ deptId, adminId })
+      if (pending?.status === 'pending') {
+        return res.status(401).json({ success: false, message: '아직 슈퍼관리자 승인 대기 중입니다.' })
+      }
+      if (pending?.status === 'rejected') {
+        return res.status(401).json({ success: false, message: '승인이 거절된 계정입니다. 슈퍼관리자에게 문의하세요.' })
+      }
+      return res.status(401).json({ success: false, message: '부서, 아이디 또는 비밀번호가 일치하지 않습니다.' })
+    }
+    const token = crypto.randomBytes(32).toString('hex')
+    await db.collection('dept_admins').updateOne({ _id: admin._id }, { $set: { token, lastLogin: new Date() } })
+    res.json({ success: true, token, deptId, role: 'dept' })
+  } catch (e) {
+    res.status(500).json({ success: false, message: '로그인 실패: ' + e.message })
+  }
+})
+
+// 부서 관리자 목록 조회 (슈퍼관리자 전용)
+app.get('/api/dept-admin/list', requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  if (!db) return res.json({ success: true, admins: [] })
+  try {
+    const admins = await db.collection('dept_admins').find({}).sort({ createdAt: -1 }).toArray()
+    // 비밀번호·토큰 제거 후 반환
+    const safe = admins.map(({ adminPw, token, ...rest }) => ({ ...rest, _id: rest._id.toString() }))
+    res.json({ success: true, admins: safe })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
+// 승인 (슈퍼관리자 전용)
+app.post('/api/dept-admin/approve', requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  const { id } = req.body
+  if (!db) return res.status(500).json({ success: false, message: 'DB 연결 없음' })
+  try {
+    const token = crypto.randomBytes(32).toString('hex')
+    await db.collection('dept_admins').updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { status: 'active', token, approvedAt: new Date() } }
+    )
+    res.json({ success: true, message: '승인되었습니다.' })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
+// 거절 (슈퍼관리자 전용)
+app.post('/api/dept-admin/reject', requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  const { id } = req.body
+  if (!db) return res.status(500).json({ success: false, message: 'DB 연결 없음' })
+  try {
+    await db.collection('dept_admins').updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { status: 'rejected', rejectedAt: new Date(), token: null } }
+    )
+    res.json({ success: true, message: '거절되었습니다.' })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
+// 삭제 (슈퍼관리자 전용)
+app.post('/api/dept-admin/delete', requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  const { id } = req.body
+  if (!db) return res.status(500).json({ success: false, message: 'DB 연결 없음' })
+  try {
+    await db.collection('dept_admins').deleteOne({ _id: new ObjectId(id) })
+    res.json({ success: true, message: '삭제되었습니다.' })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
   }
 })
 
