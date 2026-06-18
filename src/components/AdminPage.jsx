@@ -3,6 +3,7 @@ import { getAdminSettings, saveAdminSettings } from '../utils/storage'
 import { logoutAdmin, getAdminToken, isSuperAdmin, getAdminDept, changeAdminCredentials, transferAdmin } from '../utils/auth'
 import { DEFAULT_PROJECTS, getAllRecipientKeys, SPECIAL_RECIPIENT_KEYS } from '../config/projects'
 import { DEPARTMENTS } from '../config/departments'
+import DeptManager from './DeptManager'
 
 export default function AdminPage({ onAuthChange }) {
   const isSuper = isSuperAdmin()
@@ -10,6 +11,7 @@ export default function AdminPage({ onAuthChange }) {
   const [selectedDept, setSelectedDept] = useState(myDept || '매립운영처')
   const [deptAdmins, setDeptAdmins] = useState([])  // 슈퍼관리자용 신청 목록
   const [showAdminList, setShowAdminList] = useState(false)
+  const [showDeptManager, setShowDeptManager] = useState(false)
   const [settings, setSettings] = useState(() => {
     const stored = getAdminSettings()
     if (!stored.projects) stored.projects = DEFAULT_PROJECTS
@@ -380,6 +382,31 @@ export default function AdminPage({ onAuthChange }) {
         </div>
       )}
 
+      {/* 슈퍼관리자 전용: 부서 관리 */}
+      {isSuper && (
+        <div className="admin-card" style={{ marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h3 style={{ margin: 0 }}>부서 목록 관리</h3>
+            <button
+              onClick={() => setShowDeptManager(prev => !prev)}
+              style={{ padding: '5px 12px', background: '#ebf8ff', border: '1px solid #bee3f8', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit', color: '#2b6cb0' }}
+            >
+              {showDeptManager ? '접기' : '편집'}
+            </button>
+          </div>
+          {!showDeptManager && (
+            <p style={{ fontSize: '12px', color: '#718096', marginTop: '8px', marginBottom: 0 }}>
+              첫 화면의 부서 목록을 추가·삭제·순서 변경·이름 수정할 수 있습니다.
+            </p>
+          )}
+          {showDeptManager && (
+            <div style={{ marginTop: '12px' }}>
+              <DeptManager />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 서버 설정 상태 */}
       <div style={{
         padding: '12px', borderRadius: '8px', marginBottom: '12px', fontSize: '13px',
@@ -413,16 +440,23 @@ export default function AdminPage({ onAuthChange }) {
         </p>
         <div className="form-group">
           <label className="form-label">발송자 이메일 <span className="required">*</span></label>
-          <input
-            type="email"
-            className="form-input"
-            placeholder="발신자 이메일 주소"
-            value={settings.senderEmail || ''}
-            onChange={e => setSettings(prev => ({
-              ...prev,
-              senderEmail: e.target.value
-            }))}
-          />
+          {isSuper ? (
+            <input
+              type="email"
+              className="form-input"
+              placeholder="발신자 이메일 주소"
+              value={settings.senderEmail || ''}
+              onChange={e => setSettings(prev => ({
+                ...prev,
+                senderEmail: e.target.value
+              }))}
+            />
+          ) : (
+            <div style={{ padding: '10px 12px', background: '#f7fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '14px', color: '#4a5568', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ flex: 1 }}>{settings.senderEmail || '-'}</span>
+              <span style={{ fontSize: '11px', background: '#e9d8fd', color: '#553c9a', padding: '1px 7px', borderRadius: '8px', flexShrink: 0 }}>슈퍼관리자만 수정</span>
+            </div>
+          )}
         </div>
         <div className="form-group">
           <label className="form-label">카카오 오픈채팅 링크</label>

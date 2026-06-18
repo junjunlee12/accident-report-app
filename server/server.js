@@ -399,6 +399,42 @@ app.post('/api/test-email', requireAdminAuth, async (req, res) => {
   }
 })
 
+// ===== 부서 목록 설정 API =====
+
+// 부서 목록 조회 (공개 - 첫 화면 렌더링용)
+app.get('/api/dept-config', async (req, res) => {
+  if (!db) return res.json({ success: false, departments: null })
+  try {
+    const doc = await db.collection('settings').findOne({ _id: 'dept_config' })
+    if (doc?.departments) {
+      res.json({ success: true, departments: doc.departments })
+    } else {
+      res.json({ success: false, departments: null })
+    }
+  } catch (e) {
+    res.json({ success: false, departments: null })
+  }
+})
+
+// 부서 목록 저장 (슈퍼관리자 전용)
+app.post('/api/dept-config', requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  const { departments } = req.body
+  if (!Array.isArray(departments) || departments.length === 0) {
+    return res.status(400).json({ success: false, message: '부서 목록이 비어있습니다.' })
+  }
+  if (!db) return res.status(500).json({ success: false, message: 'DB 연결 없음' })
+  try {
+    await db.collection('settings').updateOne(
+      { _id: 'dept_config' },
+      { $set: { departments, updatedAt: new Date() } },
+      { upsert: true }
+    )
+    res.json({ success: true, message: '부서 설정이 저장되었습니다.' })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
 // ===== 부서 관리자 API =====
 const crypto = require('crypto')
 const { ObjectId } = require('mongodb')

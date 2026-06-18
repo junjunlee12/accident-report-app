@@ -1,14 +1,61 @@
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { DEPT_GROUPS, getDeptById } from '../config/departments'
+import { DEPT_GROUPS, DEPARTMENTS } from '../config/departments'
+
+const CACHE_KEY = 'dept_config_cache'
+const CACHE_TTL = 1000 * 60 * 60 * 24 // 24시간
+
+function flatToGroups(depts) {
+  const groups = []
+  let current = []
+  depts.forEach((dept, idx) => {
+    if (dept.rowStart && idx > 0 && current.length > 0) {
+      groups.push(current)
+      current = []
+    }
+    current.push({ id: dept.id, color: dept.color })
+  })
+  if (current.length > 0) groups.push(current)
+  return groups
+}
+
+function getStaticGroups() {
+  return DEPT_GROUPS.map(group =>
+    group.map(deptId => {
+      const dept = DEPARTMENTS.find(d => d.id === deptId)
+      return { id: deptId, color: dept?.color || '#1a365d' }
+    })
+  )
+}
+
+function getCachedGroups() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY))
+    if (cached?.departments && Date.now() - cached.ts < CACHE_TTL) {
+      return flatToGroups(cached.departments)
+    }
+  } catch {}
+  return null
+}
 
 export default function DepartmentSelect({ adminLoggedIn, onShowLogin, onLogout }) {
   const navigate = useNavigate()
+  const [groups, setGroups] = useState(() => getCachedGroups() || getStaticGroups())
 
-  // 부서 선택 화면에 머무는 동안 백엔드 미리 깨우기 (Render 슬립 해제)
   useEffect(() => {
     const API_URL = import.meta.env?.VITE_API_URL || ''
+    // 서버 미리 깨우기
     fetch(`${API_URL}/api/health`).catch(() => {})
+    // 부서 목록 최신화
+    fetch(`${API_URL}/api/dept-config`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.departments) {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({ departments: data.departments, ts: Date.now() }))
+          setGroups(flatToGroups(data.departments))
+        }
+      })
+      .catch(() => {})
   }, [])
 
   return (
@@ -107,45 +154,40 @@ export default function DepartmentSelect({ adminLoggedIn, onShowLogin, onLogout 
 
         {/* 버튼 그리드: 모든 버튼을 동일 너비(1/3)로 고정 */}
         <div style={{ width: '100%', maxWidth: '480px' }}>
-          {DEPT_GROUPS.map((group, gIdx) => (
+          {groups.map((group, gIdx) => (
             <div key={gIdx} style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-              {group.map(deptId => {
-                const dept = getDeptById(deptId)
-                const color = dept?.color || '#1a365d'
-                return (
-                  <button
-                    key={deptId}
-                    onClick={() => navigate(`/dept/${encodeURIComponent(deptId)}`)}
-                    style={{
-                      /* 행에 몇 개든 항상 1/3 너비로 고정 */
-                      width: 'calc((100% - 20px) / 3)',
-                      flexShrink: 0,
-                      padding: '14px 6px',
-                      background: 'white',
-                      border: `2.5px solid ${color}`,
-                      borderRadius: '12px',
-                      color: color,
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      letterSpacing: '-0.3px',
-                      transition: 'background 0.15s, color 0.15s',
-                      boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = color
-                      e.currentTarget.style.color = 'white'
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = 'white'
-                      e.currentTarget.style.color = color
-                    }}
-                  >
-                    {deptId}
-                  </button>
-                )
-              })}
+              {group.map(dept => (
+                <button
+                  key={dept.id}
+                  onClick={() => navigate(`/dept/${encodeURIComponent(dept.id)}`)}
+                  style={{
+                    width: 'calc((100% - 20px) / 3)',
+                    flexShrink: 0,
+                    padding: '14px 6px',
+                    background: 'white',
+                    border: `2.5px solid ${dept.color}`,
+                    borderRadius: '12px',
+                    color: dept.color,
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    letterSpacing: '-0.3px',
+                    transition: 'background 0.15s, color 0.15s',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = dept.color
+                    e.currentTarget.style.color = 'white'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'white'
+                    e.currentTarget.style.color = dept.color
+                  }}
+                >
+                  {dept.id}
+                </button>
+              ))}
             </div>
           ))}
         </div>
