@@ -7,6 +7,7 @@ import AdminLogin from './components/AdminLogin'
 import DepartmentSelect from './components/DepartmentSelect'
 import { getDeptById } from './config/departments'
 import { isAdmin, logoutAdmin } from './utils/auth'
+import { isPushSupported, getPushStatus, subscribePush, unsubscribePush } from './utils/push'
 import './App.css'
 
 const INITIAL_FORM = {
@@ -23,6 +24,56 @@ const INITIAL_FORM = {
   damageProperty: false, damagePropertyDetail: '',
   action: '', photos: [],
   showPrivacy: false, privacyAgreed: false,
+}
+
+// 🔔 알림 구독 버튼
+function PushBell({ deptId }) {
+  const [status, setStatus] = useState('loading') // loading | unsupported | denied | unsubscribed | subscribed
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (!isPushSupported()) { setStatus('unsupported'); return }
+    getPushStatus().then(setStatus)
+  }, [])
+
+  if (status === 'unsupported' || status === 'loading') return null
+
+  const handleClick = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      if (status === 'subscribed') {
+        await unsubscribePush()
+        setStatus('unsubscribed')
+      } else {
+        const permission = await Notification.requestPermission()
+        if (permission !== 'granted') { setStatus('denied'); return }
+        await subscribePush(deptId)
+        setStatus('subscribed')
+      }
+    } catch (e) {
+      alert('알림 설정 실패: ' + e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (status === 'denied') return (
+    <span style={{ fontSize: '11px', color: '#a0aec0', alignSelf: 'center' }}>알림 차단됨</span>
+  )
+
+  return (
+    <button
+      className="admin-toggle-btn"
+      onClick={handleClick}
+      disabled={busy}
+      style={status === 'subscribed' ? {
+        background: '#276749', color: '#fff', borderColor: '#276749'
+      } : {}}
+    >
+      {busy ? '...' : status === 'subscribed' ? '🔔 알림켜짐' : '🔕 알림받기'}
+    </button>
+  )
 }
 
 // 부서별 보고서 폼 페이지
@@ -83,7 +134,8 @@ function DeptPage({ adminLoggedIn, onShowLogin, onLogout }) {
           >
             ← 부서선택
           </button>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <PushBell deptId={decodedDeptId} />
             {kakaoLink && (
               <a
                 href={kakaoLink}

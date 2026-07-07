@@ -26,6 +26,10 @@ export default function AdminPage({ onAuthChange }) {
   const [newPwConfirm, setNewPwConfirm] = useState('')
   const [pwMessage, setPwMessage] = useState('')
   const [showProjectEditor, setShowProjectEditor] = useState(false)
+  const [pushMsg, setPushMsg] = useState('')
+  const [pushSending, setPushSending] = useState(false)
+  const [pushResult, setPushResult] = useState('')
+  const [subscriberCount, setSubscriberCount] = useState(null)
 
   // 사업명 목록 (업무용차량사고 + 사업명들)
   const PROJECT_NAMES = getAllRecipientKeys(settings.projects)
@@ -67,6 +71,8 @@ export default function AdminPage({ onAuthChange }) {
 
   useEffect(() => {
     checkServerStatus(selectedDept)
+    loadSubscriberCount(selectedDept)
+    setPushResult('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDept])
 
@@ -218,6 +224,47 @@ export default function AdminPage({ onAuthChange }) {
       updated.recipients[project] = updated.recipients[project].filter((_, i) => i !== idx)
       return updated
     })
+  }
+
+  const loadSubscriberCount = async (dept) => {
+    const API_URL = import.meta.env?.VITE_API_URL || ''
+    try {
+      const res = await fetch(`${API_URL}/api/push/subscriber-count?dept=${encodeURIComponent(dept || selectedDept)}`, {
+        headers: { 'X-Admin-Token': getAdminToken() }
+      })
+      const data = await res.json()
+      if (data.success) setSubscriberCount(data.count)
+    } catch {}
+  }
+
+  const handleSendPush = async () => {
+    if (!pushMsg.trim()) { setPushResult('메시지를 입력하세요.'); return }
+    if (!confirm(`"${selectedDept}" 구독자 ${subscriberCount ?? '?'}명에게 긴급 알림을 발송하시겠습니까?`)) return
+    setPushSending(true); setPushResult('')
+    const API_URL = import.meta.env?.VITE_API_URL || ''
+    try {
+      const res = await fetch(`${API_URL}/api/push/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': getAdminToken() },
+        body: JSON.stringify({
+          deptId: selectedDept,
+          title: `🚨 ${selectedDept} 긴급 알림`,
+          body: pushMsg.trim(),
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setPushResult(`발송 완료: ${data.sent}명 수신`)
+        setPushMsg('')
+        loadSubscriberCount(selectedDept)
+      } else {
+        setPushResult('발송 실패: ' + data.message)
+      }
+    } catch (e) {
+      setPushResult('오류: ' + e.message)
+    } finally {
+      setPushSending(false)
+    }
   }
 
   const handleSave = async () => {
@@ -655,6 +702,44 @@ export default function AdminPage({ onAuthChange }) {
           </button>
         </div>
       ))}
+
+      {/* 긴급 알림 발송 */}
+      <div className="admin-card" style={{ border: '2px solid #fc8181' }}>
+        <h3 style={{ color: '#c53030', margin: '0 0 4px' }}>🚨 긴급 알림 발송</h3>
+        <p style={{ fontSize: '12px', color: '#718096', marginBottom: '12px' }}>
+          {selectedDept} 부서에서 "알림받기"를 켠 인원에게 푸시 알림을 발송합니다.
+          {subscriberCount !== null && (
+            <> &nbsp;<strong style={{ color: '#c53030' }}>현재 구독자: {subscriberCount}명</strong></>
+          )}
+        </p>
+        <textarea
+          className="form-input"
+          placeholder="알림 메시지를 입력하세요 (예: 3구역 사다리차 전도 사고 발생, 즉시 현장 확인 요망)"
+          value={pushMsg}
+          onChange={e => { setPushMsg(e.target.value); setPushResult('') }}
+          rows={3}
+          style={{ resize: 'vertical', fontSize: '14px' }}
+        />
+        {pushResult && (
+          <p style={{ fontSize: '13px', color: pushResult.includes('완료') ? '#276749' : '#c53030', margin: '8px 0 0', fontWeight: '600' }}>
+            {pushResult}
+          </p>
+        )}
+        <button
+          onClick={handleSendPush}
+          disabled={pushSending || !pushMsg.trim()}
+          style={{
+            marginTop: '10px', width: '100%', padding: '12px',
+            background: pushSending || !pushMsg.trim() ? '#e2e8f0' : '#c53030',
+            color: pushSending || !pushMsg.trim() ? '#a0aec0' : 'white',
+            border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '700',
+            cursor: pushSending || !pushMsg.trim() ? 'default' : 'pointer',
+            fontFamily: 'inherit', transition: 'background 0.15s',
+          }}
+        >
+          {pushSending ? '발송 중...' : '🚨 긴급 알림 발송'}
+        </button>
+      </div>
 
       <button
         className="btn-save"

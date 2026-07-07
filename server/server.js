@@ -13,6 +13,7 @@ const cors = require('cors')
 const multer = require('multer')
 const path = require('path')
 const { MongoClient } = require('mongodb')
+const webpush = require('web-push')
 
 const app = express()
 const upload = multer({ storage: multer.memoryStorage() })
@@ -545,6 +546,110 @@ app.post('/api/dept-admin/delete', requireAdminAuth, requireSuperAdmin, async (r
   try {
     await db.collection('dept_admins').deleteOne({ _id: new ObjectId(id) })
     res.json({ success: true, message: '삭제되었습니다.' })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
+// ===== Web Push 엔드포인트 =====
+
+// VAPID 설정 (환경변수에서 읽기)
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    'mailto:junzzanghi@gmail.com',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  )
+}
+
+// VAPID 공개키 반환 (클라이언트가 구독 시 필요)
+app.get('/api/push/vapid-public-key', (req, res) => {
+  const key = process.env.VAPID_PUBLIC_KEY
+  if (!key) return res.status(500).json({ success: false, message: 'VAPID_PUBLIC_KEY 환경변수 미설정' })
+  res.json({ success: true, publicKey: key })
+})
+
+// 구독 저장 (누구나 가능)
+app.post('/api/push/subscribe', async (req, res) => {
+  const { subscription, deptId } = req.body
+  if (!db || !subscription || !deptId) return res.status(400).json({ success: false })
+  try {
+    await db.collection('push_subscriptions').updateOne(
+      { endpoint: subscription.endpoint },
+      { $set: { subscription, deptId, updatedAt: new Date() } },
+      { upsert: true }
+    )
+    res.json({ success: true })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
+// 구독 취소 (누구나 가능)
+app.post('/api/push/unsubscribe', async (req, res) => {
+  const { endpoint } = req.body
+  if (!db || !endpoint) return res.status(400).json({ success: false })
+  try {
+    await db.collection('push_subscriptions').deleteOne({ endpoint })
+    res.json({ success: true })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
+// 부서별 구독자 수 (관리자 전용)
+app.get('/api/push/subscriber-count', requireAdminAuth, async (req, res) => {
+  const { dept } = req.query
+  if (!db) return res.status(500).json({ success: false })
+  try {
+    const query = dept ? { deptId: dept } : {}
+    const count = await db.collection('push_subscriptions').countDocuments(query)
+    res.json({ success: true, count })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
+// 긴급 푸시 발송 (관리자 전용)
+app.post('/api/push/send', requireAdminAuth, async (req, res) => {
+  const { deptId, title, body } = req.body
+  if (!db) return res.status(500).json({ success: false, message: 'DB 연결 없음' })
+  if (!process.env.VAPID_PUBLIC_KEY) return res.status(500).json({ success: false, message: 'VAPID 키 미설정 — Render 환경변수를 확인하세요.' })
+
+  // 부서 관리자는 자기 부서에만 발송 가능
+  if (req.adminRole === 'dept' && deptId !== req.adminDeptId) {
+    return res.status(403).json({ success: false, message: '자신의 부서에만 발송할 수 있습니다.' })
+  }
+
+  try {
+    const query = deptId ? { deptId } : {}
+    const subs = await db.collection('push_subscriptions').find(query).toArray()
+    if (subs.length === 0) return res.json({ success: true, sent: 0, total: 0 })
+
+    const payload = JSON.stringify({
+      title: title || '🚨 긴급 알림',
+      body: body || '사고가 발생했습니다. 즉시 확인하세요.',
+      deptId,
+    })
+
+    const results = await Promise.allSettled(
+      subs.map(s => webpush.sendNotification(s.subscription, payload))
+    )
+
+    // 만료된 구독 정리 (410 Gone / 404 Not Found)
+    const expiredEndpoints = []
+    results.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        const code = r.reason?.statusCode
+        if (code === 410 || code === 404) expiredEndpoints.push(subs[i].endpoint)
+      }
+    })
+    if (expiredEndpoints.length > 0) {
+      await db.collection('push_subscriptions').deleteMany({ endpoint: { $in: expiredEndpoints } })
+    }
+
+    const sent = results.filter(r => r.status === 'fulfilled').length
+    res.json({ success: true, sent, total: subs.length })
   } catch (e) {
     res.status(500).json({ success: false, message: e.message })
   }
