@@ -554,12 +554,19 @@ app.post('/api/dept-admin/delete', requireAdminAuth, requireSuperAdmin, async (r
 // ===== Web Push 엔드포인트 =====
 
 // VAPID 설정 (환경변수에서 읽기)
-if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(
-    'mailto:junzzanghi@gmail.com',
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  )
+try {
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails(
+      'mailto:junzzanghi@gmail.com',
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    )
+    console.log('Web Push VAPID 설정 완료')
+  } else {
+    console.warn('⚠️  VAPID 키 미설정 — 긴급 알림 기능 비활성화')
+  }
+} catch (e) {
+  console.error('VAPID 설정 오류:', e.message)
 }
 
 // VAPID 공개키 반환 (클라이언트가 구독 시 필요)
@@ -664,9 +671,10 @@ app.get('*', (req, res) => {
 })
 
 const PORT = process.env.PORT || 3001
-connectDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`사고보고서 서버가 포트 ${PORT}에서 실행 중입니다.`)
-    console.log(`Brevo API: ${process.env.BREVO_API_KEY ? '설정됨' : '미설정'}`)
-  })
+
+// 서버를 먼저 띄워서 Render 헬스체크 통과, MongoDB는 백그라운드에서 연결
+app.listen(PORT, () => {
+  console.log(`사고보고서 서버가 포트 ${PORT}에서 실행 중입니다.`)
+  console.log(`Brevo API: ${process.env.BREVO_API_KEY ? '설정됨' : '미설정'}`)
 })
+connectDB()
