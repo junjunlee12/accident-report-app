@@ -634,12 +634,19 @@ app.post('/api/push/emergency', async (req, res) => {
 
 // 구독 저장 (누구나 가능)
 app.post('/api/push/subscribe', async (req, res) => {
-  const { subscription, deptId } = req.body
+  const { subscription, deptId, deviceId } = req.body
   if (!db || !subscription || !deptId) return res.status(400).json({ success: false })
   try {
+    // 같은 기기의 이전 구독(다른 endpoint) 모두 삭제 → 중복 발송 방지
+    if (deviceId) {
+      await db.collection('push_subscriptions').deleteMany({
+        deviceId,
+        endpoint: { $ne: subscription.endpoint }
+      })
+    }
     await db.collection('push_subscriptions').updateOne(
       { endpoint: subscription.endpoint },
-      { $set: { subscription, deptId, updatedAt: new Date() } },
+      { $set: { subscription, deptId, deviceId: deviceId || null, updatedAt: new Date() } },
       { upsert: true }
     )
     res.json({ success: true })
@@ -650,10 +657,14 @@ app.post('/api/push/subscribe', async (req, res) => {
 
 // 구독 취소 (누구나 가능)
 app.post('/api/push/unsubscribe', async (req, res) => {
-  const { endpoint } = req.body
+  const { endpoint, deviceId } = req.body
   if (!db || !endpoint) return res.status(400).json({ success: false })
   try {
-    await db.collection('push_subscriptions').deleteOne({ endpoint })
+    // endpoint + deviceId 기준으로 모두 삭제
+    const query = deviceId
+      ? { $or: [{ endpoint }, { deviceId }] }
+      : { endpoint }
+    await db.collection('push_subscriptions').deleteMany(query)
     res.json({ success: true })
   } catch (e) {
     res.status(500).json({ success: false, message: e.message })

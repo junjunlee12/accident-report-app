@@ -10,7 +10,7 @@ self.addEventListener('push', event => {
     tag: 'emergency-alert',
     renotify: true,
     requireInteraction: true,
-    data: { deptId: data.deptId, url: data.url || '/' },
+    data: { deptId: data.deptId, mapsUrl: data.mapsUrl || null },
   }
   event.waitUntil(self.registration.showNotification(title, options))
 })

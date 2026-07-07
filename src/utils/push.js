@@ -7,6 +7,16 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)))
 }
 
+// 기기 고유 ID — 같은 기기에서 중복 구독 방지용
+function getDeviceId() {
+  let id = localStorage.getItem('push_device_id')
+  if (!id) {
+    id = (crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36))
+    localStorage.setItem('push_device_id', id)
+  }
+  return id
+}
+
 export function isPushSupported() {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 }
@@ -33,7 +43,7 @@ export async function subscribePush(deptId) {
   await fetch(`${API_URL}/api/push/subscribe`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ subscription, deptId }),
+    body: JSON.stringify({ subscription, deptId, deviceId: getDeviceId() }),
   })
 
   return subscription
@@ -47,7 +57,7 @@ export async function unsubscribePush() {
   await fetch(`${API_URL}/api/push/unsubscribe`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ endpoint: subscription.endpoint }),
+    body: JSON.stringify({ endpoint: subscription.endpoint, deviceId: getDeviceId() }),
   })
 
   await subscription.unsubscribe()
