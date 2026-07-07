@@ -595,10 +595,18 @@ app.post('/api/push/emergency', async (req, res) => {
     const subs = await db.collection('push_subscriptions').find({ deptId }).toArray()
     if (subs.length === 0) return res.json({ success: true, sent: 0 })
 
+    const { location } = req.body
+    const mapsUrl = location
+      ? `https://maps.google.com/?q=${location.lat},${location.lng}`
+      : null
+
     const payload = JSON.stringify({
       title: `🚨 ${deptId} 긴급 상황 발생`,
-      body: '즉시 확인하세요!',
+      body: mapsUrl
+        ? `즉시 확인하세요!\n📍 발신자 위치 → ${mapsUrl}`
+        : '즉시 확인하세요!',
       deptId,
+      mapsUrl,
     })
 
     const results = await Promise.allSettled(

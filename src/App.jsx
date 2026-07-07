@@ -37,20 +37,31 @@ function EmergencyButton({ deptId }) {
     return () => clearTimeout(t)
   }, [cooldown])
 
+  const getLocation = () => new Promise((resolve) => {
+    if (!navigator.geolocation) { resolve(null); return }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { timeout: 5000, maximumAge: 30000 }
+    )
+  })
+
   const handlePress = async () => {
     if (sending || cooldown > 0) return
-    if (!confirm('🚨 긴급 상황 알림을 발송하시겠습니까?\n\n"즉시 확인하세요!" 메시지가 구독자 전체에게 전송됩니다.')) return
+    if (!confirm('🚨 긴급 상황 알림을 발송하시겠습니까?\n\n구독자 전체에게 즉시 푸시가 전송됩니다.')) return
     setSending(true)
     try {
+      // GPS 위치 시도 (실패해도 발송은 진행)
+      const location = await getLocation()
       const API_URL = import.meta.env?.VITE_API_URL || ''
       const res = await fetch(`${API_URL}/api/push/emergency`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deptId }),
+        body: JSON.stringify({ deptId, location }),
       })
       const data = await res.json()
       if (data.success) {
-        alert(`✅ 알림 발송 완료 (${data.sent}명 수신)`)
+        alert(`✅ 알림 발송 완료 (${data.sent}명 수신)${location ? '\n📍 위치 정보 포함' : ''}`)
         setCooldown(60)
       } else {
         alert('⚠️ ' + data.message)

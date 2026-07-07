@@ -5,8 +5,8 @@ self.addEventListener('push', event => {
     body: data.body || '사고가 발생했습니다. 즉시 확인하세요.',
     icon: '/logo.png',
     badge: '/logo.png',
-    // 3번 진동: 500ms진동 → 200ms정지 → 500ms진동 → 200ms정지 → 500ms진동
-    vibrate: [500, 200, 500, 200, 500],
+    // 3번 진동: 3초 → 1초 정지 → 3초 → 1초 정지 → 3초
+    vibrate: [3000, 1000, 3000, 1000, 3000],
     tag: 'emergency-alert',
     renotify: true,
     requireInteraction: true,
@@ -17,7 +17,14 @@ self.addEventListener('push', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close()
-  const deptId = event.notification.data?.deptId
+  const { deptId, mapsUrl } = event.notification.data || {}
+
+  // 위치 정보가 있으면 지도 먼저 열기
+  if (mapsUrl) {
+    event.waitUntil(clients.openWindow(mapsUrl))
+    return
+  }
+
   const hash = deptId ? `#/dept/${encodeURIComponent(deptId)}` : '#/'
   const targetUrl = self.location.origin + '/' + hash
   event.waitUntil(
