@@ -576,6 +576,54 @@ app.get('/api/push/vapid-public-key', (req, res) => {
   res.json({ success: true, publicKey: key })
 })
 
+// 긴급 버튼 — 인증 없이 누구나 발송 (부서 직원용, 고정 메시지)
+const emergencyLastSent = {}  // 부서별 마지막 발송 시각 (도배 방지)
+app.post('/api/push/emergency', async (req, res) => {
+  const { deptId } = req.body
+  if (!deptId) return res.status(400).json({ success: false, message: '부서 정보 없음' })
+  if (!db) return res.status(500).json({ success: false, message: 'DB 연결 없음' })
+  if (!process.env.VAPID_PUBLIC_KEY) return res.status(500).json({ success: false, message: 'VAPID 키 미설정' })
+
+  // 같은 부서에서 60초 내 중복 발송 방지
+  const now = Date.now()
+  if (emergencyLastSent[deptId] && now - emergencyLastSent[deptId] < 60000) {
+    const remaining = Math.ceil((60000 - (now - emergencyLastSent[deptId])) / 1000)
+    return res.status(429).json({ success: false, message: `${remaining}초 후 다시 발송 가능합니다.` })
+  }
+
+  try {
+    const subs = await db.collection('push_subscriptions').find({ deptId }).toArray()
+    if (subs.length === 0) return res.json({ success: true, sent: 0 })
+
+    const payload = JSON.stringify({
+      title: `🚨 ${deptId} 긴급 상황 발생`,
+      body: '즉시 확인하세요!',
+      deptId,
+    })
+
+    const results = await Promise.allSettled(
+      subs.map(s => webpush.sendNotification(s.subscription, payload))
+    )
+
+    const expiredEndpoints = []
+    results.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        const code = r.reason?.statusCode
+        if (code === 410 || code === 404) expiredEndpoints.push(subs[i].endpoint)
+      }
+    })
+    if (expiredEndpoints.length > 0) {
+      await db.collection('push_subscriptions').deleteMany({ endpoint: { $in: expiredEndpoints } })
+    }
+
+    emergencyLastSent[deptId] = now
+    const sent = results.filter(r => r.status === 'fulfilled').length
+    res.json({ success: true, sent })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
 // 구독 저장 (누구나 가능)
 app.post('/api/push/subscribe', async (req, res) => {
   const { subscription, deptId } = req.body

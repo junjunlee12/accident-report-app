@@ -26,6 +26,70 @@ const INITIAL_FORM = {
   showPrivacy: false, privacyAgreed: false,
 }
 
+// 🚨 긴급 버튼
+function EmergencyButton({ deptId }) {
+  const [sending, setSending] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
+
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const t = setTimeout(() => setCooldown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [cooldown])
+
+  const handlePress = async () => {
+    if (sending || cooldown > 0) return
+    if (!confirm('🚨 긴급 상황 알림을 발송하시겠습니까?\n\n"즉시 확인하세요!" 메시지가 구독자 전체에게 전송됩니다.')) return
+    setSending(true)
+    try {
+      const API_URL = import.meta.env?.VITE_API_URL || ''
+      const res = await fetch(`${API_URL}/api/push/emergency`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deptId }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        alert(`✅ 알림 발송 완료 (${data.sent}명 수신)`)
+        setCooldown(60)
+      } else {
+        alert('⚠️ ' + data.message)
+      }
+    } catch {
+      alert('서버 연결 실패. 잠시 후 다시 시도하세요.')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const disabled = sending || cooldown > 0
+
+  return (
+    <button
+      onClick={handlePress}
+      disabled={disabled}
+      style={{
+        width: '100%',
+        padding: '18px',
+        marginBottom: '16px',
+        background: disabled ? '#e2e8f0' : 'linear-gradient(135deg, #c53030, #e53e3e)',
+        color: disabled ? '#a0aec0' : 'white',
+        border: 'none',
+        borderRadius: '14px',
+        fontSize: '18px',
+        fontWeight: '800',
+        cursor: disabled ? 'default' : 'pointer',
+        fontFamily: 'inherit',
+        boxShadow: disabled ? 'none' : '0 4px 15px rgba(197,48,48,0.4)',
+        letterSpacing: '-0.3px',
+        transition: 'all 0.2s',
+      }}
+    >
+      {sending ? '발송 중...' : cooldown > 0 ? `🚨 재발송 대기 (${cooldown}초)` : '🚨 긴급 상황 알림 발송'}
+    </button>
+  )
+}
+
 // 🔔 알림 구독 버튼
 function PushBell({ deptId }) {
   const [status, setStatus] = useState('loading') // loading | unsupported | denied | unsubscribed | subscribed
@@ -196,12 +260,15 @@ function DeptPage({ adminLoggedIn, onShowLogin, onLogout }) {
       <main className="app-main">
         <Routes>
           <Route path="/" element={
-            <ReportForm
-              formData={formData}
-              setFormData={setFormData}
-              initialForm={INITIAL_FORM}
-              deptId={decodedDeptId}
-            />
+            <>
+              <EmergencyButton deptId={decodedDeptId} />
+              <ReportForm
+                formData={formData}
+                setFormData={setFormData}
+                initialForm={INITIAL_FORM}
+                deptId={decodedDeptId}
+              />
+            </>
           } />
           <Route path="/list" element={<ReportList deptId={decodedDeptId} />} />
         </Routes>
