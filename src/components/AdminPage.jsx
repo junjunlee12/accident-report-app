@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getAdminSettings, saveAdminSettings } from '../utils/storage'
 import { logoutAdmin, getAdminToken, isSuperAdmin, getAdminDept, changeAdminCredentials, transferAdmin } from '../utils/auth'
+import { getDeviceId } from '../utils/push'
 import { DEFAULT_PROJECTS, getAllRecipientKeys, SPECIAL_RECIPIENT_KEYS } from '../config/projects'
 import { DEPARTMENTS } from '../config/departments'
 import DeptManager from './DeptManager'
@@ -30,6 +31,8 @@ export default function AdminPage({ onAuthChange }) {
   const [pushSending, setPushSending] = useState(false)
   const [pushResult, setPushResult] = useState('')
   const [subscriberCount, setSubscriberCount] = useState(null)
+  const [testPushSending, setTestPushSending] = useState(false)
+  const [testPushResult, setTestPushResult] = useState('')
 
   // 사업명 목록 (업무용차량사고 + 사업명들)
   const PROJECT_NAMES = getAllRecipientKeys(settings.projects)
@@ -712,6 +715,61 @@ export default function AdminPage({ onAuthChange }) {
             <> &nbsp;<strong style={{ color: '#c53030' }}>현재 구독자: {subscriberCount}명</strong></>
           )}
         </p>
+
+        {/* 슈퍼관리자 전용: 내 기기 테스트 */}
+        {isSuper && (
+          <div style={{
+            background: '#fffaf0', border: '1px solid #f6e05e', borderRadius: '8px',
+            padding: '12px 14px', marginBottom: '14px',
+          }}>
+            <p style={{ fontSize: '12px', color: '#744210', marginBottom: '8px', lineHeight: 1.5 }}>
+              <strong>📋 알림 수신 테스트</strong><br />
+              전체 발송 전 이 기기에만 테스트 알림을 보내 정상 동작을 확인하세요.<br />
+              <span style={{ color: '#975a16' }}>먼저 부서 페이지에서 "알림받기(🔔)"를 켜야 수신됩니다.</span>
+            </p>
+            {testPushResult && (
+              <p style={{
+                fontSize: '12px', fontWeight: '600', marginBottom: '8px',
+                color: testPushResult.includes('완료') ? '#276749' : '#c53030',
+              }}>
+                {testPushResult}
+              </p>
+            )}
+            <button
+              onClick={async () => {
+                setTestPushSending(true)
+                setTestPushResult('')
+                try {
+                  const API_URL = import.meta.env?.VITE_API_URL || ''
+                  const res = await fetch(`${API_URL}/api/push/test`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': getAdminToken() },
+                    body: JSON.stringify({ deviceId: getDeviceId() }),
+                  })
+                  const data = await res.json()
+                  setTestPushResult(data.success ? `✅ ${data.message}` : `⚠️ ${data.message}`)
+                } catch (e) {
+                  setTestPushResult('⚠️ 서버 연결 실패: ' + e.message)
+                } finally {
+                  setTestPushSending(false)
+                }
+              }}
+              disabled={testPushSending}
+              style={{
+                padding: '8px 16px',
+                background: testPushSending ? '#e2e8f0' : '#fff',
+                color: testPushSending ? '#a0aec0' : '#744210',
+                border: '1px solid #f6e05e',
+                borderRadius: '6px', fontSize: '13px', fontWeight: '700',
+                cursor: testPushSending ? 'default' : 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              {testPushSending ? '발송 중...' : '📲 내 기기로 테스트 발송'}
+            </button>
+          </div>
+        )}
+
         <textarea
           className="form-input"
           placeholder="알림 메시지를 입력하세요 (예: 3구역 사다리차 전도 사고 발생, 즉시 현장 확인 요망)"

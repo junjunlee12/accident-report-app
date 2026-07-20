@@ -7,8 +7,8 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)))
 }
 
-// 기기 고유 ID — 같은 기기에서 중복 구독 방지용
-function getDeviceId() {
+// 기기 고유 ID — 같은 기기에서 중복 구독 방지용, 테스트 알림 발송에도 사용
+export function getDeviceId() {
   let id = localStorage.getItem('push_device_id')
   if (!id) {
     id = (crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36))

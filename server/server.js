@@ -729,6 +729,40 @@ app.post('/api/push/send', requireAdminAuth, async (req, res) => {
   }
 })
 
+// 테스트 알림 발송 (슈퍼관리자 전용 — 자기 기기에만)
+app.post('/api/push/test', requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  const { deviceId } = req.body
+  if (!deviceId) return res.status(400).json({ success: false, message: 'deviceId 없음' })
+  if (!db) return res.status(500).json({ success: false, message: 'DB 연결 없음' })
+  if (!process.env.VAPID_PUBLIC_KEY) return res.status(500).json({ success: false, message: 'VAPID 키 미설정' })
+
+  try {
+    const sub = await db.collection('push_subscriptions').findOne({ deviceId })
+    if (!sub) {
+      return res.json({ success: false, message: '이 기기에 등록된 구독 없음 — 먼저 부서 페이지에서 "알림받기"를 켜세요.' })
+    }
+
+    const payload = JSON.stringify({
+      title: '✅ 긴급 알림 테스트',
+      body: '관리자 테스트 알림입니다. 푸시가 정상 수신되었습니다.',
+      deptId: sub.deptId,
+    })
+
+    try {
+      await webpush.sendNotification(sub.subscription, payload)
+      res.json({ success: true, message: '테스트 알림 발송 완료 — 이 기기에서 수신 여부를 확인하세요.' })
+    } catch (e) {
+      if (e.statusCode === 410 || e.statusCode === 404) {
+        await db.collection('push_subscriptions').deleteOne({ deviceId })
+        return res.json({ success: false, message: '구독이 만료되었습니다. 부서 페이지에서 다시 "알림받기"를 켜세요.' })
+      }
+      throw e
+    }
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', db: !!db, brevo: !!process.env.BREVO_API_KEY, timestamp: new Date().toISOString() })
 })
