@@ -53,13 +53,23 @@ export default function AdminPage({ onAuthChange }) {
         setSettings(prev => ({
           ...prev,
           ...data.settings,
-          // 기본값이 있는 필드는 서버값이 없으면 기존값 유지
           projects: data.settings.projects || prev.projects || DEFAULT_PROJECTS,
-          recipients: data.settings.recipients || prev.recipients || {},
-          smtp: data.settings.smtp || prev.smtp || { email: '', appPassword: '' },
-          senderEmail: data.settings.senderEmail || prev.senderEmail || '',
+          recipients: data.settings.recipients || {},
+          smtp: data.settings.smtp || { email: '', appPassword: '' },
+          senderEmail: data.settings.senderEmail || '',
           kakaoLink: data.settings.kakaoLink || '',
+          showDrillMode: data.settings.showDrillMode || false,
         }))
+      } else {
+        // 해당 부서에 저장된 설정 없음 → 이전 부서 값 남지 않도록 초기화
+        setSettings({
+          projects: DEFAULT_PROJECTS,
+          recipients: {},
+          smtp: { email: '', appPassword: '' },
+          senderEmail: '',
+          kakaoLink: '',
+          showDrillMode: false,
+        })
       }
 
       if (data.success) {
@@ -73,6 +83,8 @@ export default function AdminPage({ onAuthChange }) {
   }
 
   useEffect(() => {
+    setSubscriberCount(null)   // 부서 전환 즉시 이전 값 지우기
+    setTestPushResult('')
     checkServerStatus(selectedDept)
     loadSubscriberCount(selectedDept)
     setPushResult('')
