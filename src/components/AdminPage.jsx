@@ -83,11 +83,20 @@ export default function AdminPage({ onAuthChange }) {
   }
 
   useEffect(() => {
-    setSubscriberCount(null)   // 부서 전환 즉시 이전 값 지우기
+    // 부서 전환 즉시 초기화 — API 응답 전에 이전 부서 값 안 보이도록
+    setSubscriberCount(null)
     setTestPushResult('')
+    setPushResult('')
+    setSettings({
+      projects: DEFAULT_PROJECTS,
+      recipients: {},
+      smtp: { email: '', appPassword: '' },
+      senderEmail: '',
+      kakaoLink: '',
+      showDrillMode: false,
+    })
     checkServerStatus(selectedDept)
     loadSubscriberCount(selectedDept)
-    setPushResult('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDept])
 
