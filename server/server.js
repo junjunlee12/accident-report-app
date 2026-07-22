@@ -671,12 +671,19 @@ app.post('/api/push/unsubscribe', async (req, res) => {
   }
 })
 
-// 이 기기의 구독 부서 조회 — localStorage migration 용
-app.get('/api/push/my-subscription', async (req, res) => {
-  const { deviceId } = req.query
-  if (!deviceId || !db) return res.json({ deptId: null })
+// 이 기기의 구독 부서 조회 — localStorage migration 용 (endpoint 우선, deviceId fallback)
+app.post('/api/push/my-subscription', async (req, res) => {
+  const { endpoint, deviceId } = req.body
+  if (!db) return res.json({ deptId: null })
   try {
-    const sub = await db.collection('push_subscriptions').findOne({ deviceId }, { projection: { deptId: 1 } })
+    const orClauses = []
+    if (endpoint) orClauses.push({ endpoint })
+    if (deviceId) orClauses.push({ deviceId })
+    if (!orClauses.length) return res.json({ deptId: null })
+    const sub = await db.collection('push_subscriptions').findOne(
+      { $or: orClauses },
+      { projection: { deptId: 1 } }
+    )
     res.json({ deptId: sub?.deptId || null })
   } catch {
     res.json({ deptId: null })

@@ -37,9 +37,13 @@ export async function getPushStatus(deptId) {
       // localStorage에 기록 있으면 빠른 경로
       return storedDept === deptId ? 'subscribed' : 'unsubscribed'
     }
-    // 기존 구독자 migration: 서버에서 어느 부서에 구독했는지 조회 후 localStorage에 기록
+    // 기존 구독자 migration: endpoint(가장 신뢰도 높음) + deviceId로 서버 조회 후 localStorage에 기록
     try {
-      const res = await fetch(`${API_URL}/api/push/my-subscription?deviceId=${getDeviceId()}`)
+      const res = await fetch(`${API_URL}/api/push/my-subscription`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: sub.endpoint, deviceId: getDeviceId() }),
+      })
       const data = await res.json()
       if (data.deptId) {
         localStorage.setItem(SUBSCRIBED_DEPT_KEY, data.deptId)
