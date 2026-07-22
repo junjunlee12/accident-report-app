@@ -30,10 +30,25 @@ export async function getPushStatus(deptId) {
   const reg = await navigator.serviceWorker.ready
   const sub = await reg.pushManager.getSubscription()
   if (!sub) return 'unsubscribed'
-  // deptId가 주어지면 해당 부서 구독 여부 확인
+
   if (deptId) {
-    return localStorage.getItem(SUBSCRIBED_DEPT_KEY) === deptId ? 'subscribed' : 'unsubscribed'
+    const storedDept = localStorage.getItem(SUBSCRIBED_DEPT_KEY)
+    if (storedDept !== null) {
+      // localStorage에 기록 있으면 빠른 경로
+      return storedDept === deptId ? 'subscribed' : 'unsubscribed'
+    }
+    // 기존 구독자 migration: 서버에서 어느 부서에 구독했는지 조회 후 localStorage에 기록
+    try {
+      const res = await fetch(`${API_URL}/api/push/my-subscription?deviceId=${getDeviceId()}`)
+      const data = await res.json()
+      if (data.deptId) {
+        localStorage.setItem(SUBSCRIBED_DEPT_KEY, data.deptId)
+        return data.deptId === deptId ? 'subscribed' : 'unsubscribed'
+      }
+    } catch {}
+    return 'unsubscribed'
   }
+
   return 'subscribed'
 }
 

@@ -671,6 +671,18 @@ app.post('/api/push/unsubscribe', async (req, res) => {
   }
 })
 
+// 이 기기의 구독 부서 조회 — localStorage migration 용
+app.get('/api/push/my-subscription', async (req, res) => {
+  const { deviceId } = req.query
+  if (!deviceId || !db) return res.json({ deptId: null })
+  try {
+    const sub = await db.collection('push_subscriptions').findOne({ deviceId }, { projection: { deptId: 1 } })
+    res.json({ deptId: sub?.deptId || null })
+  } catch {
+    res.json({ deptId: null })
+  }
+})
+
 // 부서별 구독자 수 (관리자 전용)
 app.get('/api/push/subscriber-count', requireAdminAuth, async (req, res) => {
   const { dept } = req.query

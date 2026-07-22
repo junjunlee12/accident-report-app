@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { getAdminSettings, saveAdminSettings } from '../utils/storage'
 import { logoutAdmin, getAdminToken, isSuperAdmin, getAdminDept, changeAdminCredentials, transferAdmin } from '../utils/auth'
 import { getDeviceId } from '../utils/push'
@@ -9,7 +10,10 @@ import DeptManager from './DeptManager'
 export default function AdminPage({ onAuthChange }) {
   const isSuper = isSuperAdmin()
   const myDept = getAdminDept() // 부서 관리자이면 자신의 부서, 슈퍼면 null
-  const [selectedDept, setSelectedDept] = useState(myDept || '매립운영처')
+  const location = useLocation()
+  // 부서 페이지에서 넘어온 경우 해당 부서를 초기값으로 사용
+  const initialDept = myDept || location.state?.deptId || DEPARTMENTS[0]?.id || '매립운영처'
+  const [selectedDept, setSelectedDept] = useState(initialDept)
   const [deptAdmins, setDeptAdmins] = useState([])  // 슈퍼관리자용 신청 목록
   const [showAdminList, setShowAdminList] = useState(false)
   const [showDeptManager, setShowDeptManager] = useState(false)
@@ -373,7 +377,7 @@ export default function AdminPage({ onAuthChange }) {
       {/* 부서 선택 - 슈퍼관리자: 드롭다운 / 부서 관리자: 고정 */}
       <div className="admin-card" style={{ marginBottom: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <h3 style={{ margin: 0 }}>{isSuper ? selectedDept : '담당 부서'}</h3>
+          <h3 style={{ margin: 0 }}>{isSuper ? '편집 부서 선택' : '담당 부서'}</h3>
           {!isSuper && (
             <span style={{ fontSize: '11px', background: '#e9d8fd', color: '#553c9a', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
               부서 관리자

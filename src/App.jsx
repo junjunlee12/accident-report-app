@@ -290,7 +290,7 @@ function DeptPage({ adminLoggedIn, onShowLogin, onLogout }) {
           <span>제출 내역</span>
         </Link>
         {adminLoggedIn && (
-          <Link to="/admin" className="nav-item">
+          <Link to="/admin" state={{ deptId: decodedDeptId }} className="nav-item">
             <span className="nav-icon">&#x2699;&#xFE0F;</span>
             <span>관리자</span>
           </Link>
