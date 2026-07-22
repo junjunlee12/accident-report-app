@@ -30,6 +30,17 @@ const INITIAL_FORM = {
 function EmergencyButton({ deptId }) {
   const [sending, setSending] = useState(false)
   const [cooldown, setCooldown] = useState(0)
+  const [gpsStatus, setGpsStatus] = useState('unknown') // unknown | granted | denied | unavailable
+
+  // 마운트 시 GPS 권한 상태 확인
+  useEffect(() => {
+    if (!navigator.geolocation) { setGpsStatus('unavailable'); return }
+    if (!navigator.permissions) return
+    navigator.permissions.query({ name: 'geolocation' }).then(result => {
+      setGpsStatus(result.state) // 'granted' | 'denied' | 'prompt'
+      result.onchange = () => setGpsStatus(result.state)
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (cooldown <= 0) return
@@ -42,16 +53,19 @@ function EmergencyButton({ deptId }) {
     navigator.geolocation.getCurrentPosition(
       pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => resolve(null),
-      { timeout: 5000, maximumAge: 30000 }
+      { timeout: 10000, maximumAge: 30000 }  // 5초 → 10초
     )
   })
 
   const handlePress = async () => {
     if (sending || cooldown > 0) return
-    if (!confirm('🚨 긴급 상황 알림을 발송하시겠습니까?\n\n구독자 전체에게 즉시 푸시가 전송됩니다.')) return
+    if (gpsStatus === 'denied') {
+      if (!confirm('⚠️ 위치 권한이 차단되어 있습니다.\n지도 링크 없이 알림만 발송됩니다.\n\n위치 포함을 원하면 브라우저 설정에서 위치 권한을 허용해 주세요.\n\n그냥 발송하시겠습니까?')) return
+    } else {
+      if (!confirm('🚨 긴급 상황 알림을 발송하시겠습니까?\n\n구독자 전체에게 즉시 푸시가 전송됩니다.')) return
+    }
     setSending(true)
     try {
-      // GPS 위치 시도 (실패해도 발송은 진행)
       const location = await getLocation()
       const API_URL = import.meta.env?.VITE_API_URL || ''
       const res = await fetch(`${API_URL}/api/push/emergency`, {
@@ -61,7 +75,10 @@ function EmergencyButton({ deptId }) {
       })
       const data = await res.json()
       if (data.success) {
-        alert(`✅ 알림 발송 완료 (${data.sent}명 수신)${location ? '\n📍 위치 정보 포함' : ''}`)
+        const locMsg = location
+          ? '\n📍 위치 정보 포함 — 알림 클릭 시 지도 열림'
+          : '\n📍 위치 없음 — 브라우저 위치 권한을 확인하세요'
+        alert(`✅ 알림 발송 완료 (${data.sent}명 수신)${locMsg}`)
         setCooldown(60)
       } else {
         alert('⚠️ ' + data.message)
@@ -76,28 +93,40 @@ function EmergencyButton({ deptId }) {
   const disabled = sending || cooldown > 0
 
   return (
-    <button
-      onClick={handlePress}
-      disabled={disabled}
-      style={{
-        width: '100%',
-        padding: '18px',
-        marginBottom: '16px',
-        background: disabled ? '#e2e8f0' : 'linear-gradient(135deg, #c53030, #e53e3e)',
-        color: disabled ? '#a0aec0' : 'white',
-        border: 'none',
-        borderRadius: '14px',
-        fontSize: '18px',
-        fontWeight: '800',
-        cursor: disabled ? 'default' : 'pointer',
-        fontFamily: 'inherit',
-        boxShadow: disabled ? 'none' : '0 4px 15px rgba(197,48,48,0.4)',
-        letterSpacing: '-0.3px',
-        transition: 'all 0.2s',
-      }}
-    >
-      {sending ? '발송 중...' : cooldown > 0 ? `🚨 재발송 대기 (${cooldown}초)` : '🚨 긴급 상황 알림 발송'}
-    </button>
+    <div style={{ marginBottom: '16px' }}>
+      <button
+        onClick={handlePress}
+        disabled={disabled}
+        style={{
+          width: '100%',
+          padding: '18px',
+          background: disabled ? '#e2e8f0' : 'linear-gradient(135deg, #c53030, #e53e3e)',
+          color: disabled ? '#a0aec0' : 'white',
+          border: 'none',
+          borderRadius: '14px',
+          fontSize: '18px',
+          fontWeight: '800',
+          cursor: disabled ? 'default' : 'pointer',
+          fontFamily: 'inherit',
+          boxShadow: disabled ? 'none' : '0 4px 15px rgba(197,48,48,0.4)',
+          letterSpacing: '-0.3px',
+          transition: 'all 0.2s',
+        }}
+      >
+        {sending ? '발송 중...' : cooldown > 0 ? `🚨 재발송 대기 (${cooldown}초)` : '🚨 긴급 상황 알림 발송'}
+      </button>
+      {gpsStatus === 'denied' && (
+        <p style={{ fontSize: '12px', color: '#c53030', margin: '6px 4px 0', lineHeight: 1.5 }}>
+          ⚠️ 위치 권한 차단됨 — 알림은 발송되지만 지도 링크가 포함되지 않습니다.<br />
+          브라우저 설정 → 사이트 권한 → 위치를 허용으로 변경하세요.
+        </p>
+      )}
+      {gpsStatus === 'granted' && (
+        <p style={{ fontSize: '12px', color: '#276749', margin: '6px 4px 0' }}>
+          📍 위치 권한 허용됨 — 알림 클릭 시 지도로 연결됩니다.
+        </p>
+      )}
+    </div>
   )
 }
 
