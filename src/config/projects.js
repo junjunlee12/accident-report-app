@@ -26,7 +26,9 @@ export function getCompaniesByProject(projects, projectName) {
 }
 
 // 모든 수신자 키 목록 (사업명 + 특별 항목)
+// 사업명이 하나도 없으면 빈 배열 반환 (미설정 부서에 업무용차량사고가 노출되지 않도록)
 export function getAllRecipientKeys(projects) {
   const projectNames = getProjectNames(projects)
+  if (!projectNames.length) return []
   return [...SPECIAL_RECIPIENT_KEYS, ...projectNames]
 }
