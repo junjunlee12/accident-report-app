@@ -3,6 +3,67 @@ import { saveReport, getAdminSettings } from '../utils/storage'
 import { generatePDF } from '../utils/pdfGenerator'
 import { DEFAULT_PROJECTS, getProjectNames, getCompaniesByProject } from '../config/projects'
 
+// OSM 타일 기반 위치 지도 이미지 생성 (API 키 불필요)
+async function captureMapImage(lat, lng) {
+  const TILE_SIZE = 256
+  const zoom = 16
+  const exactX = (lng + 180) / 360 * Math.pow(2, zoom)
+  const exactY = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom)
+  const centerTileX = Math.floor(exactX)
+  const centerTileY = Math.floor(exactY)
+  const fracX = exactX - centerTileX
+  const fracY = exactY - centerTileY
+
+  const canvasW = TILE_SIZE * 3  // 768px (3:2 비율)
+  const canvasH = TILE_SIZE * 2  // 512px
+  const markerX = canvasW / 2
+  const markerY = canvasH / 2
+  const centerPxX = markerX - fracX * TILE_SIZE
+  const centerPxY = markerY - fracY * TILE_SIZE
+
+  const mapCanvas = document.createElement('canvas')
+  mapCanvas.width = canvasW
+  mapCanvas.height = canvasH
+  const ctx = mapCanvas.getContext('2d')
+  ctx.fillStyle = '#e8e8e8'
+  ctx.fillRect(0, 0, canvasW, canvasH)
+
+  const tilePromises = []
+  for (let dy = -2; dy <= 2; dy++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      const px = centerPxX + dx * TILE_SIZE
+      const py = centerPxY + dy * TILE_SIZE
+      if (px + TILE_SIZE <= 0 || px >= canvasW) continue
+      if (py + TILE_SIZE <= 0 || py >= canvasH) continue
+      tilePromises.push(new Promise((resolve) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => resolve({ img, px, py })
+        img.onerror = () => resolve(null)
+        img.src = `https://tile.openstreetmap.org/${zoom}/${centerTileX + dx}/${centerTileY + dy}.png`
+      }))
+    }
+  }
+  const tiles = await Promise.all(tilePromises)
+  tiles.filter(Boolean).forEach(({ img, px, py }) => ctx.drawImage(img, px, py, TILE_SIZE, TILE_SIZE))
+
+  ctx.beginPath()
+  ctx.arc(markerX, markerY, 10, 0, Math.PI * 2)
+  ctx.fillStyle = '#e53e3e'
+  ctx.fill()
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 2.5
+  ctx.stroke()
+
+  ctx.fillStyle = 'rgba(255,255,255,0.8)'
+  ctx.fillRect(0, canvasH - 24, 220, 24)
+  ctx.fillStyle = '#333'
+  ctx.font = '13px sans-serif'
+  ctx.fillText('© OpenStreetMap contributors', 4, canvasH - 7)
+
+  return mapCanvas.toDataURL('image/jpeg', 0.85)
+}
+
 export default function ReportForm({ formData, setFormData, initialForm, deptId }) {
   const fileInputRef = useRef(null)
   const [showModal, setShowModal] = useState(false)
@@ -158,6 +219,19 @@ export default function ReportForm({ formData, setFormData, initialForm, deptId 
     try {
       const displayCompany = getDisplayCompany()
 
+      // GPS 지도 이미지 수집 (산업재해 보고서만, 실패해도 계속 진행)
+      let gpsImage = null
+      if (!form.isVehicleAccident && navigator.geolocation) {
+        try {
+          const position = await new Promise((resolve, reject) =>
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, maximumAge: 60000 })
+          )
+          gpsImage = await captureMapImage(position.coords.latitude, position.coords.longitude)
+        } catch (e) {
+          console.log('GPS 지도 수집 실패 (계속 진행):', e.message)
+        }
+      }
+
       // 사진 데이터 복사 (참조 유지)
       const photosCopy = [...form.photos]
 
@@ -166,8 +240,8 @@ export default function ReportForm({ formData, setFormData, initialForm, deptId 
       reportForSave.photoCount = photosCopy.length
       const report = saveReport(reportForSave)
 
-      // PDF에는 사진 포함
-      const reportWithPhotos = { ...report, photos: photosCopy }
+      // PDF에는 사진 + GPS 지도 포함
+      const reportWithPhotos = { ...report, photos: photosCopy, gpsImage }
       setSubmittedReport(reportWithPhotos)
 
       const pdfBlob = await generatePDF(reportWithPhotos)

@@ -10,8 +10,18 @@ export async function generatePDF(report) {
 
 // ===== 산업재해 발생보고서 PDF =====
 async function generateAccidentPDF(report) {
-  // 한글 폰트 로드
   const doc = new jsPDF('p', 'mm', 'a4')
+
+  // GPS 지도 이미지 미리 로드 (있는 경우)
+  let gpsMapImg = null
+  if (report.gpsImage) {
+    gpsMapImg = await new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = () => resolve(null)
+      img.src = report.gpsImage
+    })
+  }
 
   // 기본 폰트로는 한글 출력이 안 되므로, HTML Canvas 기반으로 PDF 생성
   const canvas = document.createElement('canvas')
@@ -155,11 +165,11 @@ async function generateAccidentPDF(report) {
   }
   y += personHeight
 
-  // 5. 발생경위 (autoDesc는 \n으로 3줄 구성됨)
+  // 5. 발생경위 — A4 한 페이지 꽉 채우도록 고정 높이
+  // 계산: 297 - 10(하단여백) - 31(제목영역) - 46(위 고정행) - 46(아래 고정행) = 164mm
   const autoDesc = buildAutoDescription(report)
   const fullDesc = autoDesc + (report.description ? '\n' + report.description : '')
-  const allLines = fullDesc.split('\n')
-  const descHeight = Math.max(50, allLines.length * 6 + Math.ceil(allLines.reduce((s, l) => s + l.length, 0) / 28) * 5 + 5)
+  const descHeight = 164
 
   drawRect(leftCol, y, tableWidth, descHeight)
   drawRect(leftCol, y, labelWidth, descHeight)
@@ -170,6 +180,22 @@ async function generateAccidentPDF(report) {
   ctx.font = `normal ${mm(9 * 0.35)}px 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif`
   ctx.fillStyle = '#000'
   wrapText(ctx, fullDesc, mm(contentStart + 3), mm(y + 6), mm(contentWidth - 6), mm(5))
+
+  // GPS 지도 이미지 (있는 경우 셀 하단에 표시)
+  if (gpsMapImg) {
+    const mapPad = 3
+    const mapMaxW = mm(contentWidth - mapPad * 2)
+    const imgRatio = gpsMapImg.naturalWidth / gpsMapImg.naturalHeight
+    const mapH = Math.min(mm(90), mapMaxW / imgRatio)
+    const mapW = Math.min(mapMaxW, mapH * imgRatio)
+    const mapX = mm(contentStart + mapPad)
+    const mapY = mm(y + descHeight - mapPad) - mapH
+    ctx.font = `normal ${mm(8 * 0.35)}px 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif`
+    ctx.fillStyle = '#555555'
+    ctx.fillText('📍 발생 위치 (GPS)', mapX, mapY - mm(2.5))
+    ctx.drawImage(gpsMapImg, mapX, mapY, mapW, mapH)
+  }
+
   y += descHeight
 
   // 6. 피해정도
@@ -193,7 +219,7 @@ async function generateAccidentPDF(report) {
   y += damageHeight
 
   // 7. 조치 및 결과
-  const actionHeight = Math.max(20, Math.ceil((report.action || '').length / 30) * 6 + 10)
+  const actionHeight = 20
   drawRect(leftCol, y, tableWidth, actionHeight)
   drawRect(leftCol, y, labelWidth, actionHeight)
   drawFilledRect(leftCol + 0.15, y + 0.15, labelWidth - 0.3, actionHeight - 0.3, '#f0f4f8')
@@ -205,11 +231,6 @@ async function generateAccidentPDF(report) {
 
   // 8. 붙임물
   drawRow('붙임물', report.photos?.length > 0 ? `별도첨부 사진 ${report.photos.length}매` : '없음')
-
-  // 하단 작성정보
-  y += 5
-  drawText(`작성일: ${new Date().toLocaleDateString('ko-KR')}`, leftCol, y + 5, { fontSize: 9, color: '#666' })
-  drawText('사업명: ' + (report.projectName || ''), leftCol, y + 10, { fontSize: 9, color: '#666' })
 
   // Canvas를 이미지로 변환 후 PDF에 추가
   const imgData = canvas.toDataURL('image/png')
@@ -510,5 +531,5 @@ function buildAutoDescription(report) {
   // 3줄: 일시
   const line3 = `'${dateStr}${timeStr}'에`
 
-  return `${line1}\n${line2}\n${line3}`
+  return `${line1}\n${line2} ${line3}`
 }
