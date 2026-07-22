@@ -373,7 +373,7 @@ export default function AdminPage({ onAuthChange }) {
       {/* 부서 선택 - 슈퍼관리자: 드롭다운 / 부서 관리자: 고정 */}
       <div className="admin-card" style={{ marginBottom: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <h3 style={{ margin: 0 }}>{isSuper ? '편집 부서 선택' : '담당 부서'}</h3>
+          <h3 style={{ margin: 0 }}>{isSuper ? selectedDept : '담당 부서'}</h3>
           {!isSuper && (
             <span style={{ fontSize: '11px', background: '#e9d8fd', color: '#553c9a', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
               부서 관리자

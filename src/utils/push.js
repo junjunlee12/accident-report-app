@@ -21,12 +21,20 @@ export function isPushSupported() {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 }
 
-export async function getPushStatus() {
+// 현재 구독 중인 부서를 localStorage에 저장/조회 (브라우저 구독은 전역이지만 부서별 구분 필요)
+const SUBSCRIBED_DEPT_KEY = 'push_subscribed_dept'
+
+export async function getPushStatus(deptId) {
   if (!isPushSupported()) return 'unsupported'
   if (Notification.permission === 'denied') return 'denied'
   const reg = await navigator.serviceWorker.ready
   const sub = await reg.pushManager.getSubscription()
-  return sub ? 'subscribed' : 'unsubscribed'
+  if (!sub) return 'unsubscribed'
+  // deptId가 주어지면 해당 부서 구독 여부 확인
+  if (deptId) {
+    return localStorage.getItem(SUBSCRIBED_DEPT_KEY) === deptId ? 'subscribed' : 'unsubscribed'
+  }
+  return 'subscribed'
 }
 
 export async function subscribePush(deptId) {
@@ -46,6 +54,9 @@ export async function subscribePush(deptId) {
     body: JSON.stringify({ subscription, deptId, deviceId: getDeviceId() }),
   })
 
+  // 구독 부서 로컬에 기록 (다른 부서 페이지에서 '알림켜짐' 오표시 방지)
+  localStorage.setItem(SUBSCRIBED_DEPT_KEY, deptId)
+
   return subscription
 }
 
@@ -61,4 +72,5 @@ export async function unsubscribePush() {
   })
 
   await subscription.unsubscribe()
+  localStorage.removeItem(SUBSCRIBED_DEPT_KEY)
 }

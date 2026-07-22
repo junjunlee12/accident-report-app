@@ -137,8 +137,8 @@ function PushBell({ deptId }) {
 
   useEffect(() => {
     if (!isPushSupported()) { setStatus('unsupported'); return }
-    getPushStatus().then(setStatus)
-  }, [])
+    getPushStatus(deptId).then(setStatus)
+  }, [deptId])
 
   if (status === 'unsupported' || status === 'loading') return null
 
