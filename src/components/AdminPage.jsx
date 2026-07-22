@@ -70,7 +70,7 @@ export default function AdminPage({ onAuthChange }) {
           projects: DEFAULT_PROJECTS,
           recipients: {},
           smtp: { email: '', appPassword: '' },
-          senderEmail: '',
+          senderEmail: 'junzzanghi@gmail.com',
           kakaoLink: '',
           showDrillMode: false,
         })
@@ -95,7 +95,7 @@ export default function AdminPage({ onAuthChange }) {
       projects: DEFAULT_PROJECTS,
       recipients: {},
       smtp: { email: '', appPassword: '' },
-      senderEmail: '',
+      senderEmail: 'junzzanghi@gmail.com',
       kakaoLink: '',
       showDrillMode: false,
     })
@@ -514,24 +514,11 @@ export default function AdminPage({ onAuthChange }) {
           Brevo에서 인증한 이메일 주소를 입력하세요.
         </p>
         <div className="form-group">
-          <label className="form-label">발송자 이메일 <span className="required">*</span></label>
-          {isSuper ? (
-            <input
-              type="email"
-              className="form-input"
-              placeholder="발신자 이메일 주소"
-              value={settings.senderEmail || ''}
-              onChange={e => setSettings(prev => ({
-                ...prev,
-                senderEmail: e.target.value
-              }))}
-            />
-          ) : (
-            <div style={{ padding: '10px 12px', background: '#f7fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '14px', color: '#4a5568', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ flex: 1 }}>{settings.senderEmail || '-'}</span>
-              <span style={{ fontSize: '11px', background: '#e9d8fd', color: '#553c9a', padding: '1px 7px', borderRadius: '8px', flexShrink: 0 }}>슈퍼관리자만 수정</span>
-            </div>
-          )}
+          <label className="form-label">발송자 이메일</label>
+          <div style={{ padding: '10px 12px', background: '#f7fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '14px', color: '#4a5568', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ flex: 1 }}>junzzanghi@gmail.com</span>
+            <span style={{ fontSize: '11px', background: '#e2e8f0', color: '#718096', padding: '1px 7px', borderRadius: '8px', flexShrink: 0 }}>Brevo 인증 고정</span>
+          </div>
         </div>
         <div className="form-group">
           <label className="form-label">카카오 오픈채팅 링크</label>
