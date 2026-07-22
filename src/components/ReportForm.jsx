@@ -352,19 +352,17 @@ export default function ReportForm({ formData, setFormData, initialForm, deptId 
               업무용 차량 사고
             </span>
           </label>
-          {showDrillMode && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={form.isMockDrill}
-                onChange={e => update('isMockDrill', e.target.checked)}
-                style={{ width: '22px', height: '22px', accentColor: '#276749' }}
-              />
-              <span style={{ fontSize: '15px', fontWeight: '700', color: '#276749' }}>
-                모의훈련
-              </span>
-            </label>
-          )}
+          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={form.isMockDrill}
+              onChange={e => update('isMockDrill', e.target.checked)}
+              style={{ width: '22px', height: '22px', accentColor: '#276749' }}
+            />
+            <span style={{ fontSize: '15px', fontWeight: '700', color: '#276749' }}>
+              모의훈련
+            </span>
+          </label>
         </div>
         {form.isVehicleAccident && (
           <div className="form-group" style={{ marginTop: '12px' }}>

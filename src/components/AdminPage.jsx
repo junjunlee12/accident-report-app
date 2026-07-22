@@ -39,7 +39,7 @@ export default function AdminPage({ onAuthChange }) {
   const [testPushResult, setTestPushResult] = useState('')
 
   // 사업명 목록 (업무용차량사고 + 사업명들)
-  const PROJECT_NAMES = getAllRecipientKeys(settings.projects, settings.recipients)
+  const PROJECT_NAMES = getAllRecipientKeys(settings.projects)
 
   // 서버 설정 상태 확인
   const checkServerStatus = async (dept) => {

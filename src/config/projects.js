@@ -27,10 +27,9 @@ export function getCompaniesByProject(projects, projectName) {
 
 // 모든 수신자 키 목록 (사업명 + 특별 항목)
 // - 사업명이 없으면 빈 배열
-// - 업무용차량사고 등 특별 항목은 해당 부서에 수신자가 이미 설정된 경우에만 포함
-export function getAllRecipientKeys(projects, recipients = {}) {
+// - 사업명이 1개 이상이면 업무용차량사고 항목 무조건 포함
+export function getAllRecipientKeys(projects) {
   const projectNames = getProjectNames(projects)
   if (!projectNames.length) return []
-  const activeSpecial = SPECIAL_RECIPIENT_KEYS.filter(k => (recipients[k] || []).length > 0)
-  return [...activeSpecial, ...projectNames]
+  return [...SPECIAL_RECIPIENT_KEYS, ...projectNames]
 }
