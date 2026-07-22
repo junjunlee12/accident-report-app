@@ -6,33 +6,9 @@
  * 이후 모든 사용자에게 해당 설정이 적용됩니다.
  */
 
-export const DEFAULT_PROJECTS = [
-  {
-    name: '수도권매립지관리공사',
-    companies: [
-      { label: '매립운영처', base: '매립운영처' },
-      { label: '주민감시요원', base: '주민감시요원' },
-    ],
-  },
-  {
-    name: '제3매립장(1단계) 매립작업 및 부대공사',
-    companies: [
-      { label: '(주)대우건설(하도급 포함)', base: '(주)대우건설' },
-    ],
-  },
-  {
-    name: '수도권매립지 계측관리 용역',
-    companies: [
-      { label: '(주)테스콤(하도급 포함)', base: '(주)테스콤' },
-    ],
-  },
-  {
-    name: '통합계량대 인프라 유지관리용역',
-    companies: [
-      { label: '(주)투비콤(하도급 포함)', base: '(주)투비콤' },
-    ],
-  },
-]
+// 부서별 사업명/소속은 관리자 페이지에서 설정 후 MongoDB에 저장
+// 서버에 설정이 없는 부서는 빈 상태에서 시작 (매립운영처 데이터가 다른 부서에 노출되지 않도록)
+export const DEFAULT_PROJECTS = []
 
 // 업무용차량사고는 사업명 목록에는 없지만 수신자 설정용 특별 항목
 export const SPECIAL_RECIPIENT_KEYS = ['업무용차량사고']
