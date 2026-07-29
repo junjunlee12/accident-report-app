@@ -28,7 +28,8 @@ app.use(cors({
     if (allowedOrigins.length === 0) return callback(null, true)
     // 허용 목록에 있으면 통과
     if (allowedOrigins.includes(origin)) return callback(null, true)
-    // 그 외는 차단
+    // 그 외는 차단 (차단된 도메인 로그에 기록)
+    console.warn(`CORS 차단: ${origin} (허용 목록: ${allowedOrigins.join(', ')})`)
     callback(new Error('CORS 정책 위반: 허용되지 않은 도메인'))
   }
 }))
