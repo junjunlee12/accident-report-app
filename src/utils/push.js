@@ -27,18 +27,27 @@ const SUBSCRIBED_DEPT_KEY = 'push_subscribed_dept'
 export async function getPushStatus(deptId) {
   if (!isPushSupported()) return 'unsupported'
   if (Notification.permission === 'denied') return 'denied'
+
+  if (deptId) {
+    const storedDept = localStorage.getItem(SUBSCRIBED_DEPT_KEY)
+    if (storedDept !== null) {
+      // localStorage 값이 있으면 serviceWorker 대기 없이 즉시 반환 (첫 로드 지연 방지)
+      // 백그라운드에서 실제 구독 유효성 확인 — 구독이 취소됐으면 localStorage 정리
+      navigator.serviceWorker.ready
+        .then(reg => reg.pushManager.getSubscription())
+        .then(sub => { if (!sub) localStorage.removeItem(SUBSCRIBED_DEPT_KEY) })
+        .catch(() => {})
+      return storedDept === deptId ? 'subscribed' : 'unsubscribed'
+    }
+  }
+
+  // localStorage 없으면 serviceWorker로 실제 구독 확인
   const reg = await navigator.serviceWorker.ready
   const sub = await reg.pushManager.getSubscription()
   if (!sub) return 'unsubscribed'
 
   if (deptId) {
-    const storedDept = localStorage.getItem(SUBSCRIBED_DEPT_KEY)
-    if (storedDept !== null) {
-      // localStorage에 기록 있으면 빠른 경로
-      return storedDept === deptId ? 'subscribed' : 'unsubscribed'
-    }
-    // 기존 구독자 migration: endpoint(가장 신뢰도 높음) + deviceId로 서버 조회 후 localStorage에 기록
-    // 서버 슬립 중 무한 대기 방지 — 5초 타임아웃
+    // 기존 구독자 migration: 서버 조회 후 localStorage에 기록 (5초 타임아웃)
     try {
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), 5000)
