@@ -38,12 +38,17 @@ export async function getPushStatus(deptId) {
       return storedDept === deptId ? 'subscribed' : 'unsubscribed'
     }
     // 기존 구독자 migration: endpoint(가장 신뢰도 높음) + deviceId로 서버 조회 후 localStorage에 기록
+    // 서버 슬립 중 무한 대기 방지 — 5초 타임아웃
     try {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 5000)
       const res = await fetch(`${API_URL}/api/push/my-subscription`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ endpoint: sub.endpoint, deviceId: getDeviceId() }),
+        signal: controller.signal,
       })
+      clearTimeout(timer)
       const data = await res.json()
       if (data.deptId) {
         localStorage.setItem(SUBSCRIBED_DEPT_KEY, data.deptId)
